@@ -14,8 +14,8 @@ class OpenGLWidget(QOpenGLWidget):
         self._updateScale = False
         self._prevMousePos = None
 
+        self._shapes = []
         self._camera = None
-        self._shader = None
         self.setGeometry(100, 100, 400, 400)
 
     def keyPressEvent(self, event):
@@ -62,8 +62,11 @@ class OpenGLWidget(QOpenGLWidget):
         self.update()
 
     def initializeGL(self):
-        self._shape = Shape()
-        self._camera = Camera2D(400, 400)
+        backgroundGrid = Shape()
+        self._shapes.append(backgroundGrid)
+
+        windowSize = self.size()
+        self._camera = Camera2D(windowSize.width(), windowSize.height())
 
     def paintGL(self):
         GL.glClearColor(0.2, 0.3, 0.3, 1.0)
@@ -73,7 +76,8 @@ class OpenGLWidget(QOpenGLWidget):
         self._camera.setImageSize(windowSize.width(), windowSize.height())
         GL.glViewport(0, 0, int(self._camera._width), int(self._camera._height))
 
-        self._shape.draw(self._camera)
+        for shape in self._shapes:
+            shape.draw(self._camera)
 
 
 if __name__ == "__main__":
