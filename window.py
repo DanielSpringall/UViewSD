@@ -1,6 +1,7 @@
 import numpy as np
 from camera import Camera2D
 from shape import Shape
+import states
 from OpenGL import GL
 from PySide2.QtWidgets import QOpenGLWidget, QApplication
 from PySide2.QtCore import Qt
@@ -10,9 +11,7 @@ class OpenGLWidget(QOpenGLWidget):
     def __init__(self, *args, **kwargs):
         QOpenGLWidget.__init__(self, *args, **kwargs)
 
-        self._updateTranslate = False
-        self._updateScale = False
-        self._prevMousePos = None
+        self._activeState = None
 
         self._shapes = []
         self._camera = None
@@ -23,42 +22,29 @@ class OpenGLWidget(QOpenGLWidget):
             self._camera.reset()
             self.update()
 
-    def mouseMoveEvent(self, event):
-        pos = event.pos()
-        mousePos = np.array((pos.x(), pos.y()))
-        if self._updateTranslate:
-            xTransform = (mousePos[0] - self._prevMousePos[0]) * 2
-            yTransform = (self._prevMousePos[1] - mousePos[1]) * 2
-            self._camera.pan(np.array((xTransform, yTransform), dtype=np.float32))
-            self._prevMousePos = mousePos
-            self.update()
-        if self._updateScale:
-            dist = np.linalg.norm(self._prevMousePos - mousePos)
-            self._camera.zoom(dist)
-            self.update()
-
     def mousePressEvent(self, event):
-        if QApplication.keyboardModifiers() == Qt.AltModifier:
-            pos = event.pos()
-            self._prevMousePos = np.array((pos.x(), pos.y()))
-            if event.button() == Qt.MiddleButton:
-                self._updateTranslate = True
-            elif event.button() == Qt.RightButton:
-                self._updateScale = True
-                self._camera.beginDynamicZoom()
+        if not self._activeState:
+            newState = states.getState(event)
+            if newState:
+                self._activeState = newState(event, self._camera)
+
+    def mouseMoveEvent(self, event):
+        if self._activeState and self._activeState.update(event):
+            self.update()
 
     def mouseReleaseEvent(self, event):
-        if event.button() == Qt.MiddleButton:
-            self._updateTranslate = False
-        if event.button() == Qt.RightButton:
-            self._updateScale = False
+        if self._activeState and self._activeState.shouldDisable(event.button()):
+            self._activeState = None
 
     def wheelEvent(self, event):
+        if self._activeState:
+            return
+
         pos = event.pos()
         mousePos = np.array((pos.x() * 2, (self.size().height() - pos.y()) * 2))
         delta = event.angleDelta().y()
         zoomAmount = (delta and delta // abs(delta)) * 0.05
-        self._camera.zoom(mousePos, zoomAmount)
+        self._camera.zoom(mousePos, zoomAmount, additive=True)
         self.update()
 
     def initializeGL(self):

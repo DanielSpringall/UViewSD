@@ -13,15 +13,9 @@ class Camera2D:
         self._top = height
         self._bottom = 0
 
-        self._dynamicZoomActive = False
-        self._dynamicScale = None
-        self._dynamicScaleCopy = None
-        self._dynamicTranslation = None
-        self._dynamicTranslationCopy = None
-
         self._translation = np.array((0, 0), dtype=np.float32)
-        self._minScale = 0.0001
-        self._scale = 1
+        self._minZoom = 0.0001
+        self._zoom = 1
 
     def pan(self, translation):
         self._translation += np.array(
@@ -32,52 +26,23 @@ class Camera2D:
 
     def reset(self):
         self._translation = np.array((0, 0), dtype=np.float32)
-        self._scale = 1
+        self._zoom = 1
         self._height = self._originalHeight
         self._width = self._originalWidth
 
-    def zoom(self, pos, amount):
-        if not self._dynamicZoomActive:
-            scaleAmount = self._scale + amount
-            if scaleAmount <= self._minScale:
-                return
+    def zoom(self, pos, amount, additive=False):
+        finalZoom = self._zoom + amount if additive else amount
+        if finalZoom <= self._minZoom:
+            return
+        offsetZoomAmount = amount if additive else amount - self._zoom
 
-            targetWidth = self._width - (self._width * amount)
-            tx = ((targetWidth - self._width) * (pos[0] / self._width) / self._width)
-            targetHeight = self._height - (self._height * amount)
-            ty = ((targetHeight - self._height) * (pos[1] / self._height) / self._height)
+        targetWidth = self._width - (self._width * offsetZoomAmount)
+        tx = ((targetWidth - self._width) * (pos[0] / self._width) / self._width)
+        targetHeight = self._height - (self._height * offsetZoomAmount)
+        ty = ((targetHeight - self._height) * (pos[1] / self._height) / self._height)
 
-            self._translation += np.array((tx , ty), dtype=np.float32)
-            self._scale = scaleAmount
-        else:
-            scaleAmount = self._scale + amount
-            if scaleAmount <= self._minScale:
-                return
-            
-            self._dynamicScale = amount
-
-            targetWidth = self._width - (self._width * amount)
-            tx = ((targetWidth - self._width) * (pos[0] / self._width) / self._width)
-            targetHeight = self._height - (self._height * amount)
-            ty = ((targetHeight - self._height) * (pos[1] / self._height) / self._height)
-
-            self._dynamicTranslation = np.array((tx , ty), dtype=np.float32)
-            self._translation = self._dynamicTranslationCopy + self._dynamicTranslation
-            self._scale = self._dynamicScaleCopy + self._dynamicScale
-
-    def endDynamicZoom(self):
-        self._dynamicZoomActive = False
-        self._dynamicScale = None
-        self._dynamicScaleCopy = None
-        self._dynamicTranslation = None
-        self._dynamicTranslationCopy = None
-
-    def beginDynamicZoom(self):
-        self._dynamicZoomActive = True
-        self._dynamicScale = 0
-        self._dynamicScaleCopy = self._scale
-        self._dynamicTranslation = np.array((0, 0), dtype=np.float32)
-        self._dynamicTranslationCopy = self._translation
+        self._translation += np.array((tx , ty), dtype=np.float32)
+        self._zoom = finalZoom
 
     def focus(self, left, right, top, bottom, width, height):
         pass
@@ -90,8 +55,8 @@ class Camera2D:
         widthRatio = self._width / self._originalWidth
         heightRatio = self._height / self._originalHeight
 
-        xScale = (2.0 / (self._right - self._left) / widthRatio) * self._scale
-        yScale = (2.0 / (self._top - self._bottom) / heightRatio) * self._scale
+        xScale = (2.0 / (self._right - self._left) / widthRatio) * self._zoom
+        yScale = (2.0 / (self._top - self._bottom) / heightRatio) * self._zoom
         zScale = 1.0
 
         xTransform = -(self._right + self._left) / (self._right - self._left)
