@@ -1,7 +1,7 @@
 #version 330 core
 
 precision mediump float;
-varying vec3 colour;
+uniform vec3 colour;
 
 void main()
 {

@@ -53,7 +53,7 @@ class TestShape(BaseShape):
     def __init__(self):
         BaseShape.__init__(self)
 
-        self._shader = ShaderProgram(vertexShaderName="default2", fragmentShaderName="grid")
+        self._shader = ShaderProgram()
         self._positions = np.array(
             [-10.0, -10.0,
              -10.0,  10.0,
@@ -153,7 +153,7 @@ class Grid:
 
         for data in self._lineData:
             GL.glBindVertexArray(data["vao"])
-            self._shader.setVec3f("vColour", data["colour"])
+            self._shader.setVec3f("colour", data["colour"])
             GL.glLineWidth(data["width"])
             GL.glDrawArrays(GL.GL_LINES, 0, data["numVerts"])
             GL.glBindVertexArray(0)
