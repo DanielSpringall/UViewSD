@@ -8,10 +8,10 @@ class Camera2D:
         self._width = width
         self._height = height
 
-        self._left = -1.1
+        self._left = -0.1
         self._right = 1.1
         self._top = 1.1
-        self._bottom = -1.1
+        self._bottom = -0.1
 
         self._translation = np.array((0, 0), dtype=np.float32)
         self._minZoom = 0.0001

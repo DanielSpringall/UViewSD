@@ -1,8 +1,9 @@
 #version 330 core
 
-in vec3 lineColour;
+precision mediump float;
+varying vec3 colour;
 
 void main()
 {
-    gl_FragColor = vec4(lineColour, 1.0);
+    gl_FragColor = vec4(colour, 1.0);
 }

@@ -4,6 +4,7 @@ import shape
 import states
 from OpenGL import GL
 from PySide2.QtWidgets import QOpenGLWidget, QApplication
+from PySide2.QtGui import QPainter, QFont
 from PySide2.QtCore import Qt
 
 
@@ -12,9 +13,12 @@ class OpenGLWidget(QOpenGLWidget):
         QOpenGLWidget.__init__(self, *args, **kwargs)
 
         self._activeState = None
+        self._background = None
         self._shapes = []
         self._camera = None
         self.setGeometry(850, 400, 800, 800)
+
+        self._done = False
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_R:
@@ -63,23 +67,32 @@ class OpenGLWidget(QOpenGLWidget):
         self._camera.zoom(mousePos, zoomAmount)
         self.update()
 
+    def drawText(self):
+        return
+        painter = QPainter()
+        painter.begin(self)
+        painter.setPen(Qt.black)
+        painter.setFont(QFont("Arial", 10))
+        painter.drawText(0, 0, 100, 100, Qt.AlignLeft, "Test");
+        painter.end()
+
     def initializeGL(self):
-        # backgroundGrid = shape.TestShape()
-        # self._shapes.append(backgroundGrid)
-        backgroundGrid = shape.Grid()
-        self._shapes.append(backgroundGrid)
+        self._background = shape.Grid()
         self._camera = Camera2D(self.width(), self.height())
 
-    def paintGL(self):
-        width = self.width()
-        height = self.height()
+    def resizeGL(self, width, height):
         GL.glViewport(0, 0, width, height)
         self._camera.setImageSize(width, height)
 
+    def paintGL(self):
         GL.glClearColor(0.3, 0.3, 0.3, 1.0)
         GL.glClear(GL.GL_COLOR_BUFFER_BIT)
+
+        self._background.draw(self._camera)
         for shape in self._shapes:
             shape.draw(self._camera)
+        # self._selectionMarquee.draw()
+        self.drawText()
 
 
 if __name__ == "__main__":
