@@ -8,10 +8,10 @@ class Camera2D:
         self._width = width
         self._height = height
 
-        self._left = 0
-        self._right = width
-        self._top = height
-        self._bottom = 0
+        self._left = -0.1
+        self._right = 1.1
+        self._top = 1.1
+        self._bottom = -0.1
 
         self._translation = np.array((0, 0), dtype=np.float32)
         self._minZoom = 0.0001
@@ -30,19 +30,18 @@ class Camera2D:
         self._height = self._originalHeight
         self._width = self._originalWidth
 
-    def zoom(self, pos, amount, additive=False):
-        finalZoom = self._zoom + amount if additive else amount
-        if finalZoom <= self._minZoom:
+    def zoom(self, pos, amount):
+        if self._zoom + amount <= self._minZoom:
             return
-        offsetZoomAmount = amount if additive else amount - self._zoom
 
-        targetWidth = self._width - (self._width * offsetZoomAmount)
-        tx = ((targetWidth - self._width) * (pos[0] / self._width) / self._width)
-        targetHeight = self._height - (self._height * offsetZoomAmount)
-        ty = ((targetHeight - self._height) * (pos[1] / self._height) / self._height)
+        targetWidth = self._width - (self._width * amount)
+        targetHeight = self._height - (self._height * amount)
+
+        tx = (targetWidth - self._width) * (pos[0] / self._width) / self._width
+        ty = (targetHeight - self._height) * (pos[1] / self._height) / self._height
 
         self._translation += np.array((tx , ty), dtype=np.float32)
-        self._zoom = finalZoom
+        self._zoom = self._zoom + amount
 
     def focus(self, left, right, top, bottom, width, height):
         pass

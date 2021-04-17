@@ -1,18 +1,25 @@
-#version 120
-varying vec4 v_uv;
-uniform vec4 params;
+#version 330 core
 
 out vec4 FragColor;
- 
-float grid(vec2 st, float res)
-{
-  vec2 grid = fract(st*res);
-  return (step(res,grid.x) * step(res,grid.y));
-}
- 
+in vec2 uvs;
+uniform float imageWidth;
+uniform float imageHeight;
+
+float gridSize = 10.0;
+
+
 void main()
 {
-  vec2 grid_uv = v_uv.xy * params.x; // scale
-  float x = grid(grid_uv, params.y); // resolution
-  FragColor = vec4(vec3(0.5) * x, 1.0);
+    vec2 uv = gl_FragCoord.xy / vec2(imageWidth, imageHeight) * vec2(imageWidth / imageHeight, 1.0);
+    // float width = (gridSize * 1.2) / imageHeight;
+    // uv = fract(uv * gridSize);
+    // // abs version
+    // float grid = max(
+    //     1.0 - abs((uv.y - 0.5) / width),
+    //     1.0 - abs((uv.x - 0.5) / width)
+    // );
+
+    // Output to screen (for shadertoy only)
+    // gl_FragColor = vec4(grid, grid, grid, 1.0);
+    gl_FragColor = vec4(uv.x, uv.y, 0.0, 1.0);
 }
