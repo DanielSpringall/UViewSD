@@ -86,7 +86,10 @@ class ShaderProgram:
         GL.glUniform1f(GL.glGetUniformLocation(self.programId, name), float(value))
 
     def setVec2f(self, name, value):
-        GL.glUniform2fv(GL.glGetUniformLocation(self.programId, name), value); 
+        GL.glUniform2fv(GL.glGetUniformLocation(self.programId, name), value)
+
+    def setVec3f(self, name, value):
+        GL.glUniform3fv(GL.glGetUniformLocation(self.programId, name), 1, value)
 
     def setMatrix4f(self, name, value):
-        GL.glUniformMatrix4fv(GL.glGetUniformLocation(self.programId, name), 1, GL.GL_FALSE, value); 
+        GL.glUniformMatrix4fv(GL.glGetUniformLocation(self.programId, name), 1, GL.GL_FALSE, value)

@@ -64,7 +64,7 @@ class OpenGLWidget(QOpenGLWidget):
         self.update()
 
     def initializeGL(self):
-        # backgroundGrid = shape.GridOld()
+        # backgroundGrid = shape.TestShape()
         # self._shapes.append(backgroundGrid)
         backgroundGrid = shape.Grid()
         self._shapes.append(backgroundGrid)
@@ -76,7 +76,7 @@ class OpenGLWidget(QOpenGLWidget):
         GL.glViewport(0, 0, width, height)
         self._camera.setImageSize(width, height)
 
-        GL.glClearColor(0.2, 0.3, 0.3, 1.0)
+        GL.glClearColor(0.3, 0.3, 0.3, 1.0)
         GL.glClear(GL.GL_COLOR_BUFFER_BIT)
         for shape in self._shapes:
             shape.draw(self._camera)
