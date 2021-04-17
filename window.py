@@ -17,8 +17,7 @@ class OpenGLWidget(QOpenGLWidget):
         self._shapes = []
         self._camera = None
         self.setGeometry(850, 400, 800, 800)
-
-        self._done = False
+        self.setFixedSize(800, 800)
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_R:

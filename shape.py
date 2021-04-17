@@ -89,7 +89,7 @@ class Grid:
         lineIntervals = 10 # Line every 0.1 units
 
         incrementalLines = []
-        singleUnitLines = []
+        unitLines = []
         originLines = []
 
         maxVal = numGridsFromOrigin
@@ -106,27 +106,27 @@ class Grid:
             if lineOffset == 0:
                 originLines.extend(lineVerts)
             elif offset - int(offset) == 0:
-                singleUnitLines.extend(lineVerts)
+                unitLines.extend(lineVerts)
             else:
                 incrementalLines.extend(lineVerts)
 
         uLine = [0.0, 0.0, 0.5, 0.0]
         vLine = [0.0, 0.0, 0.0, 0.5]
 
-        baseColour = (0.2, 0.2, 0.2)
-        originColour = (0.1, 0.1, 0.95)
+        baseColour = (0.0, 0.0, 0.0)
+        incrementalColour = (0.23, 0.23, 0.23)
+        originColour = (0.0, 0.0, 1.0)
         uColour = (1.0, 0.0, 0.0)
         vColor = (1.0, 1.0, 0.0)
         self._lineData = [
-            self.initializeGLData(np.array(singleUnitLines, dtype=np.float32), width=2.0, colour=baseColour),
-            self.initializeGLData(np.array(incrementalLines, dtype=np.float32), width=1.0, colour=baseColour),
-            self.initializeGLData(np.array(originLines, dtype=np.float32), width=2.0, colour=originColour),
-            self.initializeGLData(np.array(originLines, dtype=np.float32), width=2.0, colour=originColour),
-            self.initializeGLData(np.array(uLine, dtype=np.float32), width=2.0, colour=uColour),
-            self.initializeGLData(np.array(vLine, dtype=np.float32), width=2.0, colour=vColor),
+            self.initializeGLData(np.array(incrementalLines, dtype=np.float32), colour=incrementalColour),
+            self.initializeGLData(np.array(unitLines, dtype=np.float32), colour=baseColour),
+            self.initializeGLData(np.array(originLines, dtype=np.float32), colour=originColour),
+            self.initializeGLData(np.array(uLine, dtype=np.float32), colour=uColour),
+            self.initializeGLData(np.array(vLine, dtype=np.float32), colour=vColor),
         ]
 
-    def initializeGLData(self, lineData, width, colour):
+    def initializeGLData(self, lineData, colour):
         vao = GL.glGenVertexArrays(1)
         pbo = GL.glGenBuffers(1)
 
@@ -143,7 +143,6 @@ class Grid:
         data = {
             "vao": vao,
             "numVerts": int(len(lineData) / 2),
-            "width": width,
             "colour": colour
         }
         return data
@@ -151,10 +150,10 @@ class Grid:
     def draw(self, camera):
         self._setupShader(camera)
 
+        GL.glLineWidth(1.0)
         for data in self._lineData:
             GL.glBindVertexArray(data["vao"])
             self._shader.setVec3f("colour", data["colour"])
-            GL.glLineWidth(data["width"])
             GL.glDrawArrays(GL.GL_LINES, 0, data["numVerts"])
             GL.glBindVertexArray(0)
 
