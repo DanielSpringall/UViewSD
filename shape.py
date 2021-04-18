@@ -47,29 +47,57 @@ class BaseShape:
         GL.glBindVertexArray(0)
 
 
-class TestShape(BaseShape):
+class UVShape:
     def __init__(self):
         BaseShape.__init__(self)
 
-        self._shader = ShaderProgram()
-        self._positions = np.array(
-            [-10.0, -10.0,
-             -10.0,  10.0,
-              10.0, -10.0,
-              10.0,  10.0], dtype=np.float32
-        )
-        self._indices = np.array(
-            [0, 1, 2,
-             1, 2, 3], dtype=np.int
-        )
-        self._uvs = np.array(
-            [0.0, 0.0,
-             0.0, 1.0,
-             1.0, 0.0,
-             1.0, 1.0], dtype=np.float32
-        )
-        self._numVertices = len(self._indices)
-        self.initializeGLData()
+        self._shader = ShaderProgram(vertexShaderName="line", fragmentShaderName="line")
+
+        uvLines = [
+            0.2, 0.2,
+            0.5, 0.8,
+            0.5, 0.8,
+            0.8, 0.2,
+            0.8, 0.2,
+            0.2, 0.2
+        ]
+
+        baseColour = (1.0, 1.0, 1.0)
+        self._lineData = [
+            self.initializeGLData(np.array(uvLines, dtype=np.float32), colour=baseColour),
+        ]
+
+    def initializeGLData(self, lineData, colour):
+        vao = GL.glGenVertexArrays(1)
+        pbo = GL.glGenBuffers(1)
+
+        GL.glBindVertexArray(vao)
+        GL.glBindBuffer(GL.GL_ARRAY_BUFFER, pbo)
+
+        GL.glEnableVertexAttribArray(0)
+        GL.glVertexAttribPointer(0, 2, GL.GL_FLOAT, GL.GL_FALSE, 0, c_void_p(0))
+
+        GL.glBufferData(GL.GL_ARRAY_BUFFER, lineData.nbytes, lineData, GL.GL_STATIC_DRAW)
+
+        GL.glBindVertexArray(0)
+
+        data = {
+            "vao": vao,
+            "numVerts": int(len(lineData) / 2),
+            "colour": colour
+        }
+        return data
+
+    def draw(self, projectionMatrix):
+        self._shader.use()
+        self._shader.setMatrix4f("viewMatrix", projectionMatrix)
+
+        GL.glLineWidth(1.0)
+        for data in self._lineData:
+            GL.glBindVertexArray(data["vao"])
+            self._shader.setVec3f("colour", data["colour"])
+            GL.glDrawArrays(GL.GL_LINES, 0, data["numVerts"])
+            GL.glBindVertexArray(0)
 
 
 class Grid:

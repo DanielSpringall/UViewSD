@@ -15,10 +15,10 @@ def stateFromEvent(event):
 class BaseState:
     def __init__(self, event, camera, width, height):
         self._camera = camera
-        self._initialProjectionMatrix = self._camera._projectionMatrix
+        self._initProjMat = self._camera._projMat
         self._width = width
         self._height = height
-        [self._initialXPos, self._initialYPos] = self.glScreenPosition(event)
+        [self._initXPos, self._initYPos] = self.glScreenPosition(event)
 
     def glScreenPosition(self, event):
         position = event.pos()
@@ -44,7 +44,7 @@ class ZoomState(BaseState):
         worldCoords = self._camera.screenToWorldCoord([pos.x()/width, pos.y()/height])
         self._transMat = np.matrix.transpose(self._camera.createTransformationMatrix(-worldCoords[0], -worldCoords[1]))
         self._invTransMat = np.matrix.transpose(self._camera.createTransformationMatrix(worldCoords[0], worldCoords[1]))
-        self._initialProjectionMatrix = np.matrix.transpose(self._initialProjectionMatrix)
+        self._initProjMat = np.matrix.transpose(self._initProjMat)
 
     @staticmethod
     def canEnable(modifiers, button):
@@ -56,12 +56,12 @@ class ZoomState(BaseState):
 
     def update(self, event):
         [xPos, yPos] = self.glScreenPosition(event)
-        xZoom = xPos - self._initialXPos
-        yZoom = self._initialYPos - yPos
+        xZoom = xPos - self._initXPos
+        yZoom = self._initYPos - yPos
         zoomAmount = 1 + (xZoom + yZoom) / 2
 
         zoomedProjectionMatrix = np.matrix.transpose(
-            self._camera.scaleMatrix(self._initialProjectionMatrix, zoomAmount, self._transMat, self._invTransMat)
+            self._camera.scaleMatrix(self._initProjMat, zoomAmount, self._transMat, self._invTransMat)
         )
 
         self._camera.setProjectionMatrix(zoomedProjectionMatrix)
@@ -84,9 +84,9 @@ class PanState(BaseState):
         [xPos, yPos] = self.glScreenPosition(event)
 
         transformMatrix = self._camera.createTransformationMatrix(
-            xPos - self._initialXPos,
-            yPos - self._initialYPos
+            xPos - self._initXPos,
+            yPos - self._initYPos
         )
-        projMat = np.matmul(self._initialProjectionMatrix, transformMatrix)
+        projMat = np.matmul(self._initProjMat, transformMatrix)
         self._camera.setProjectionMatrix(projMat)
         return True

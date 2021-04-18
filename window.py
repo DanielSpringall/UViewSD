@@ -17,11 +17,13 @@ class OpenGLWidget(QOpenGLWidget):
         self._shapes = []
         self._camera = None
         self.setGeometry(850, 400, 800, 800)
-        self.setFixedSize(800, 800)
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_R:
             self._camera.reset()
+            self.update()
+        elif event.key() == Qt.Key_F:
+            self._camera.focus(0, 1, 1, 0)
             self.update()
         elif event.key() == Qt.Key_Up:
             self._camera.zoom((0.5, 0.5), 0.5)
@@ -75,10 +77,11 @@ class OpenGLWidget(QOpenGLWidget):
     def initializeGL(self):
         self._background = shape.Grid()
         self._camera = Camera2D(self.width(), self.height())
+        self._shapes.append(shape.UVShape())
 
     def resizeGL(self, width, height):
         GL.glViewport(0, 0, width, height)
-        self._camera.setImageSize(width, height)
+        self._camera.resize(width, height)
 
     def paintGL(self):
         GL.glClearColor(0.3, 0.3, 0.3, 1.0)
