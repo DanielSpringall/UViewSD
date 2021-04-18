@@ -38,12 +38,10 @@ class BaseShape:
 
         GL.glBindVertexArray(0); 
 
-    def _setupShader(self, camera):
+    def draw(self, projectionMatrix):
         self._shader.use()
-        self._shader.setMatrix4f("viewMatrix", camera.projectionMatrix())
+        self._shader.setMatrix4f("viewMatrix", projectionMatrix)
 
-    def draw(self, camera):
-        self._setupShader(camera)
         GL.glBindVertexArray(self._vao)
         GL.glDrawElements(GL.GL_TRIANGLES, self._numVertices, GL.GL_UNSIGNED_INT, c_void_p(0))
         GL.glBindVertexArray(0)
@@ -72,11 +70,6 @@ class TestShape(BaseShape):
         )
         self._numVertices = len(self._indices)
         self.initializeGLData()
-
-    def _setupShader(self, camera):
-        BaseShape._setupShader(self, camera)
-        self._shader.setFloat("imageWidth", float(camera._width))
-        self._shader.setFloat("imageHeight", float(camera._height))
 
 
 class Grid:
@@ -147,8 +140,9 @@ class Grid:
         }
         return data
 
-    def draw(self, camera):
-        self._setupShader(camera)
+    def draw(self, projectionMatrix):
+        self._shader.use()
+        self._shader.setMatrix4f("viewMatrix", projectionMatrix)
 
         GL.glLineWidth(1.0)
         for data in self._lineData:
@@ -156,7 +150,3 @@ class Grid:
             self._shader.setVec3f("colour", data["colour"])
             GL.glDrawArrays(GL.GL_LINES, 0, data["numVerts"])
             GL.glBindVertexArray(0)
-
-    def _setupShader(self, camera):
-        self._shader.use()
-        self._shader.setMatrix4f("viewMatrix", camera.projectionMatrix())

@@ -24,27 +24,25 @@ class OpenGLWidget(QOpenGLWidget):
             self._camera.reset()
             self.update()
         elif event.key() == Qt.Key_Up:
-            pos = np.array((400, 400))
-            self._camera.zoom(pos, 0.1)
+            self._camera.zoom((0.5, 0.5), 0.5)
             self.update()
         elif event.key() == Qt.Key_Down:
-            pos = np.array((400, 400))
-            self._camera.zoom(pos, -0.1)
+            self._camera.zoom((0.5, 0.5), 2)
             self.update()
         elif event.key() == Qt.Key_Left:
-            pos = np.array((200, 200))
-            self._camera.zoom(pos, -0.1)
+            self._camera.pan(-1, 0)
             self.update()
         elif event.key() == Qt.Key_Right:
-            pos = np.array((200, 200))
-            self._camera.zoom(pos, 0.1)
+            self._camera.pan(1, 0)
             self.update()
 
     def mousePressEvent(self, event):
-        if not self._activeState:
-            newState = states.getState(event)
-            if newState:
-                self._activeState = newState(event, self._camera)
+        if event.button() == Qt.LeftButton:
+            pos = event.pos()
+        elif not self._activeState:
+            state = states.stateFromEvent(event)
+            if state:
+                self._activeState = state(event, self._camera, self.width(), self.height())
 
     def mouseMoveEvent(self, event):
         if self._activeState and self._activeState.update(event):
@@ -59,11 +57,10 @@ class OpenGLWidget(QOpenGLWidget):
             return
 
         pos = event.pos()
-        # mousePos = np.array((pos.x() * 2, (self.size().height() - pos.y()) * 2))
-        mousePos = np.array((self.width(), self.height()))
+        screenCoords = [pos.x() / self.width(), pos.y() / self.height()]
         delta = event.angleDelta().y()
-        zoomAmount = (delta and delta // abs(delta)) * self._camera._zoom * 0.03
-        self._camera.zoom(mousePos, zoomAmount)
+        zoomAmount = 1 + (delta and delta // abs(delta)) * 0.03
+        self._camera.zoom(screenCoords, zoomAmount)
         self.update()
 
     def drawText(self):
@@ -87,11 +84,12 @@ class OpenGLWidget(QOpenGLWidget):
         GL.glClearColor(0.3, 0.3, 0.3, 1.0)
         GL.glClear(GL.GL_COLOR_BUFFER_BIT)
 
-        self._background.draw(self._camera)
+        projectionMatrix = self._camera.projectionMatrix()
+        self._background.draw(projectionMatrix)
         for shape in self._shapes:
-            shape.draw(self._camera)
+            shape.draw(projectionMatrix)
         # self._selectionMarquee.draw()
-        self.drawText()
+        # self.drawText()
 
 
 if __name__ == "__main__":

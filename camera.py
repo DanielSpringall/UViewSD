@@ -3,45 +3,48 @@ import numpy as np
 
 class Camera2D:
     def __init__(self, width, height):
-        self._originalWidth = width
-        self._originalHeight = height
-        self._width = width
-        self._height = height
-
-        self._left = -0.1
-        self._right = 1.1
-        self._top = 1.1
-        self._bottom = -0.1
-
-        self._translation = np.array((0, 0), dtype=np.float32)
-        self._minZoom = 0.0001
-        self._zoom = 1
-
-    def pan(self, translation):
-        self._translation += np.array(
-            (translation[0] / self._originalWidth,
-             translation[1] / self._originalHeight), 
-            dtype=np.float32
+        self._projectionMatrix = None
+        self._inverseProjectionMatrix = None
+        self.setProjectionMatrix(
+            self.createProjectionMatrix(-0.1, 1.1, 1.1, -0.1)
         )
 
+    def pan(self, xOffset, yOffset):
+        transformationMatrix = self.createTransformationMatrix(xOffset, yOffset)
+        self.setProjectionMatrix(np.matmul(self._projectionMatrix, transformationMatrix))
+
     def reset(self):
-        self._translation = np.array((0, 0), dtype=np.float32)
-        self._zoom = 1
-        self._height = self._originalHeight
-        self._width = self._originalWidth
+        self.setProjectionMatrix(
+            self.createProjectionMatrix(-0.1, 1.1, 1.1, -0.1)
+        )
 
-    def zoom(self, pos, amount):
-        if self._zoom + amount <= self._minZoom:
-            return
+    @staticmethod
+    def glToScreenCoord(coord):
+        return [coord[0] / 2 + 0.5, coord[1] / -2 + 0.5]
 
-        targetWidth = self._width - (self._width * amount)
-        targetHeight = self._height - (self._height * amount)
+    @staticmethod
+    def screenToGlCoord(coord):
+        return [(coord[0] - 0.5) * 2, (coord[1] - 0.5) * -2]
 
-        tx = (targetWidth - self._width) * (pos[0] / self._width) / self._width
-        ty = (targetHeight - self._height) * (pos[1] / self._height) / self._height
+    def screenToWorldCoord(self, coord):
+        glCoord = self.screenToGlCoord(coord)
+        glScreenPosition = np.array([glCoord[0], glCoord[1], 0, 1])
+        return self._inverseProjectionMatrix.dot(glScreenPosition)[:2]
 
-        self._translation += np.array((tx , ty), dtype=np.float32)
-        self._zoom = self._zoom + amount
+    def zoom(self, coord, amount):
+        worldCoords = self.screenToWorldCoord(coord)
+        transMat = np.matrix.transpose(Camera2D.createTransformationMatrix(-worldCoords[0], -worldCoords[1]))
+        invTransMat = np.matrix.transpose(Camera2D.createTransformationMatrix(worldCoords[0], worldCoords[1]))
+        projectionMatrix = np.matrix.transpose(self._projectionMatrix)
+        self.setProjectionMatrix(np.matrix.transpose(self.scaleMatrix(projectionMatrix, amount, transMat, invTransMat)))
+
+    @staticmethod
+    def scaleMatrix(matrixToScale, amount, transMat, invTransMat):
+        matrixToScale = np.matmul(matrixToScale, invTransMat)
+        matrixToScale[0][0] *= amount
+        matrixToScale[1][1] *= amount
+        matrixToScale = np.matmul(matrixToScale, transMat)
+        return matrixToScale
 
     def focus(self, left, right, top, bottom, width, height):
         pass
@@ -50,24 +53,32 @@ class Camera2D:
         self._width = width
         self._height = height
 
+    def setProjectionMatrix(self, matrix):
+        self._projectionMatrix = matrix
+        self._inverseProjectionMatrix = np.matrix.transpose(np.linalg.inv(matrix))
+
     def projectionMatrix(self):
-        widthRatio = self._width / self._originalWidth
-        heightRatio = self._height / self._originalHeight
+        return np.matrix.flatten(self._projectionMatrix)
 
-        xScale = (2.0 / (self._right - self._left) / widthRatio) * self._zoom
-        yScale = (2.0 / (self._top - self._bottom) / heightRatio) * self._zoom
-        zScale = 1.0
+    @staticmethod
+    def createProjectionMatrix(left, right, top, bottom):
+        xScale = 2.0 / (right - left)
+        yScale = 2.0 / (top - bottom)
 
-        xTransform = -(self._right + self._left) / (self._right - self._left)
-        xTransform += self._translation[0] / widthRatio # x translation
-        yTransform = -(self._top + self._bottom) / (self._top - self._bottom)
-        yTransform -= 2 * ((self._originalHeight - self._height) / self._height) # y translation
-        yTransform += self._translation[1] / heightRatio # anchor y offset to the top left of the image
-        zTransform = 0
+        xTransform = -((right + left) / (right - left))
+        yTransform = -((top + bottom) / (top - bottom))
 
-        return np.array([
-            xScale,     0,          0,          0,
-            0,          yScale,     0,          0,
-            0,          0,          zScale,     0,
-            xTransform, yTransform, zTransform, 1.0,
-        ], dtype=np.float32)
+        projectionMat = np.identity(4)
+        projectionMat[0][0] = xScale
+        projectionMat[1][1] = yScale
+        projectionMat[3][0] = xTransform
+        projectionMat[3][1] = yTransform
+
+        return projectionMat
+
+    @staticmethod
+    def createTransformationMatrix(xTransform, yTransform):
+        matrix = np.identity(4)
+        matrix[3][0] = xTransform
+        matrix[3][1] = yTransform
+        return matrix
