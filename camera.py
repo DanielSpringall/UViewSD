@@ -5,29 +5,18 @@ class Camera2D:
     def __init__(self, width, height):
         self._projMat = None
         self._projMat_aspectRatio = None
-        self._invProj = None
+        self._invProj_aspectRatio = None
         self._aspectRatio = width / height
         self._focusBuffer = 0.1
         self.focus(0, 1, 1, 0)
 
     def focus(self, left, right, top, bottom):
-        targetWidth = (right - left)
-        targetWidth += targetWidth * self._focusBuffer
-        targetHeight = (top - bottom)
-        targetHeight += targetHeight * self._focusBuffer
-        targetAspectRatio = targetWidth / targetHeight
-
-        if targetAspectRatio >= self._aspectRatio:
-            left = -self._aspectRatio / targetAspectRatio * targetWidth / 2.0
-            right = self._aspectRatio / targetAspectRatio * targetWidth / 2.0
-            top = targetHeight / 2.0
-            bottom = -targetHeight / 2.0
-        else:
-            left = -targetWidth / 2.0
-            right = targetWidth / 2.0
-            top = targetAspectRatio / self._aspectRatio * targetHeight / 2.0
-            bottom = -targetAspectRatio / self._aspectRatio * targetHeight / 2.0
-
+        xBuffer = (right - left) * self._focusBuffer
+        yBuffer = (top - bottom) * self._focusBuffer
+        left -= xBuffer
+        right += xBuffer
+        top += yBuffer
+        bottom -= yBuffer
         projMat = self.createProjectionMatrix(left, right, top, bottom)
         self.setProjectionMatrix(projMat)
 
@@ -35,8 +24,9 @@ class Camera2D:
         transformationMatrix = self.createTransformationMatrix(xOffset, yOffset)
         self.setProjectionMatrix(np.matmul(self._projMat, transformationMatrix))
 
-    def reset(self):
-        self.setProjectionMatrix(self.createProjectionMatrix(-0.1, 1.1, 1.1, -0.1))
+    @staticmethod
+    def glToScreenCoord(coord):
+        return [coord[0] / 2 + 0.5, coord[1] / -2 + 0.5]
 
     @staticmethod
     def screenToGlCoord(coord):
@@ -44,8 +34,13 @@ class Camera2D:
 
     def screenToWorldCoord(self, coord):
         glCoord = self.screenToGlCoord(coord)
-        glScreenPosition = np.array([glCoord[0], glCoord[1], 0, 1])
-        return self._invProj.dot(glScreenPosition)[:2]
+        glScreenPosition = np.array([glCoord[0], glCoord[1], 0.0, 1.0])
+        return self._invProj_aspectRatio.dot(glScreenPosition)[:2]
+
+    def worldToScreenCoord(self, coord):
+        worldCoord = np.array([coord[0], coord[1], 0.0, 1.0])
+        screenGlCoord = np.matrix.transpose(self._projMat_aspectRatio).dot(worldCoord)[:2]
+        return self.glToScreenCoord(screenGlCoord)
 
     def zoom(self, coord, amount):
         worldCoords = self.screenToWorldCoord(coord)
@@ -71,10 +66,11 @@ class Camera2D:
     def setProjectionMatrix(self, matrix):
         self._projMat = matrix
         self._projMat_aspectRatio = self._applyAspectRatioToMatrix(matrix.copy())
-        self._invProj = np.matrix.transpose(np.linalg.inv(self._projMat))
+        self._invProj_aspectRatio = np.matrix.transpose(np.linalg.inv(self._projMat_aspectRatio))
 
     def _applyAspectRatioToMatrix(self, matrix):
         matrix[1][1] *= self._aspectRatio
+        matrix[3][1] *= self._aspectRatio
         return matrix
 
     def projectionMatrix(self):

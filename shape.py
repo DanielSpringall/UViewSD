@@ -100,23 +100,24 @@ class UVShape:
             GL.glBindVertexArray(0)
 
 
+NUM_GRIDS_FROM_ORIGIN = 5
+LINE_INTERVALS = 10 # Line every 0.1 units
+TOTAL_LINES = NUM_GRIDS_FROM_ORIGIN * LINE_INTERVALS
+
 class Grid:
     def __init__(self):
         BaseShape.__init__(self)
 
         self._shader = ShaderProgram(vertexShaderName="line", fragmentShaderName="line")
 
-        numGridsFromOrigin = 5
-        lineIntervals = 10 # Line every 0.1 units
-
         incrementalLines = []
         unitLines = []
         originLines = []
 
-        maxVal = numGridsFromOrigin
-        minVal = -numGridsFromOrigin
-        for i in range((numGridsFromOrigin * lineIntervals) * 2 + 1):
-            offset = i / lineIntervals
+        maxVal = NUM_GRIDS_FROM_ORIGIN
+        minVal = -NUM_GRIDS_FROM_ORIGIN
+        for i in range((TOTAL_LINES) * 2 + 1):
+            offset = i / LINE_INTERVALS
             lineOffset = minVal + offset
             lineVerts = [
                 minVal, lineOffset, # x start
