@@ -19,9 +19,9 @@ class ViewerWidget(QtWidgets.QOpenGLWidget):
         self._camera = None
 
     def clear(self):
-        for shape in self._shapes:
+        # for shape in self._shapes:
             # Do something to shapes?
-            pass
+            # pass
         self._shapes = []
 
     def addShape(self, shape):
@@ -32,6 +32,7 @@ class ViewerWidget(QtWidgets.QOpenGLWidget):
         pass
 
     def keyPressEvent(self, event):
+        print("ViewerWidget.keyPressEvent")
         if event.key() == QtCore.Qt.Key_F:
             self._camera.focus(0, 1, 1, 0)
             self.update()
@@ -134,13 +135,14 @@ class ViewerWidget(QtWidgets.QOpenGLWidget):
 
 
 class Window(QtWidgets.QMainWindow):
-    def __init__(self, parent, stage=None, *args, **kwargs):
+    def __init__(self, parent, stage=None, usdviewApi=None, *args, **kwargs):
         QtWidgets.QMainWindow.__init__(self, parent=parent, *args, **kwargs)
         self._view = ViewerWidget()
         self.setCentralWidget(self._view)
 
         self.setGeometry(850, 400, 800, 800)
 
+        self._usdviewApi = usdviewApi
         self._stage = stage
 
     def addPrimPath(self, primPath, override=False):
@@ -164,19 +166,25 @@ class Window(QtWidgets.QMainWindow):
         consumedIndices = 0
         uvLines = []
         for faceVertCount in faceVertCountList:
-            faceUVs = []
+            lines = []
             for i in range(faceVertCount):
-                faceVertIndex = consumedIndices + i
-                uvIndex = uvIndices[faceVertIndex]
-                faceUVs.append(uvValues[uvIndex])
-            lines = [
-                faceUVs[0], faceUVs[1], faceUVs[1], faceUVs[2], faceUVs[2], faceUVs[3], faceUVs[3], faceUVs[0]
-            ]
+                edgeStartIndex = consumedIndices + i
+                edgeEndIndex = consumedIndices if i  == (faceVertCount - 1) else edgeStartIndex + 1
+                lines.extend([uvValues[uvIndices[edgeStartIndex]], uvValues[uvIndices[edgeEndIndex]]])
             flattenedlines = [uv for uvData in lines for uv in uvData]
             uvLines.extend(flattenedlines)
             consumedIndices += faceVertCount
 
         self._view.addShape(shape.UVShape(uvLines))
+
+    def keyPressEvent(self, event):
+        print("window.keyPressEvent")
+        if event.key() == QtCore.Qt.Key_R and self._usdviewApi:
+            for path in self._usdviewApi.selectedPaths:
+                self._view.clear()
+                self.addPrimPath(path)
+
+        QtWidgets.QMainWindow.keyPressEvent(self, event)
 
     @staticmethod
     def _getRelevantAttributesFromPrim(prim):
@@ -185,9 +193,11 @@ class Window(QtWidgets.QMainWindow):
         uvAttr = prim.GetAttribute("primvars:st")
         return faceVertCountAttr, uvIndexAttr, uvAttr
 
+    def test(self, *args, **kwargs):
+        print("In here!!!")
+
 
 def run(usdviewApi=None, primPath=None):
-    primPath = "/Kitchen_set/Props_grp/DiningTable_grp/KitchenTable_1/Geom/Top"
 
     if usdviewApi:
         stage = usdviewApi.stage
@@ -196,9 +206,14 @@ def run(usdviewApi=None, primPath=None):
         stage = Usd.Stage.Open("C:\\Libraries\\USD\\share\\usd\\kitchenSet\\Kitchen_set.usd")
         parent = None
 
-    window = Window(parent=parent, stage=stage)
+    window = Window(parent=parent, stage=stage, usdviewApi=usdviewApi)
     window.show()
-    window.addPrimPath(primPath)
+    if usdviewApi:
+        usdviewApi.dataModel.signalPrimsChanged.connect(window.test)
+    # primPath = "/Kitchen_set/Props_grp/DiningTable_grp/KitchenTable_1/Geom/Top"
+    # window.addPrimPath(primPath)
+    # primPath = "/Kitchen_set/Arch_grp/Kitchen_1/Geom/Sink_Curtain/nurbsToPoly22"
+    # window.addPrimPath(primPath)
 
     return window
 
