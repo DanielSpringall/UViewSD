@@ -1,26 +1,38 @@
+from OpenGL import GL
+from PySide2 import QtWidgets, QtGui, QtCore
 import numpy as np
-from camera import Camera2D
+from pxr import Usd
+
 import shape
 import states
-from OpenGL import GL
-from PySide2.QtWidgets import QOpenGLWidget, QApplication
-from PySide2.QtGui import QPainter, QColor
-from PySide2.QtCore import Qt, QRect, QPoint, QSize
+import camera
 
 
-class ViewerWidget(QOpenGLWidget):
+class ViewerWidget(QtWidgets.QOpenGLWidget):
     def __init__(self, *args, **kwargs):
-        QOpenGLWidget.__init__(self, *args, **kwargs)
+        QtWidgets.QOpenGLWidget.__init__(self, *args, **kwargs)
 
         self._painter = None
         self._activeState = None
         self._background = None
         self._shapes = []
         self._camera = None
-        self.setGeometry(850, 400, 800, 800)
+
+    def clear(self):
+        for shape in self._shapes:
+            # Do something to shapes?
+            pass
+        self._shapes = []
+
+    def addShape(self, shape):
+        self._shapes.append(shape)
+        self.update()
+
+    def removeShape(self):
+        pass
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key_F:
+        if event.key() == QtCore.Qt.Key_F:
             self._camera.focus(0, 1, 1, 0)
             self.update()
 
@@ -49,11 +61,17 @@ class ViewerWidget(QOpenGLWidget):
         self._camera.zoom(screenCoords, zoomAmount)
         self.update()
 
+    def addShape(self, shape):
+        self._shapes.append(shape)
+        self.update()
+
+    def removeShape(self, shape):
+        pass
+
     def initializeGL(self):
         self._background = shape.Grid()
-        self._camera = Camera2D(self.width(), self.height())
-        self._shapes.append(shape.UVShape())
-        self._painter = QPainter()
+        self._camera = camera.Camera2D(self.width(), self.height())
+        self._painter = QtGui.QPainter()
 
     def resizeGL(self, width, height):
         GL.glViewport(0, 0, width, height)
@@ -103,9 +121,9 @@ class ViewerWidget(QOpenGLWidget):
                 top = originY - increment * height
 
             text = str(offset)
-            painter.drawText(left, top, doubleWidth, height, Qt.AlignLeft | Qt.AlignBottom, text)
+            painter.drawText(left, top, doubleWidth, height, QtCore.Qt.AlignLeft | QtCore.Qt.AlignBottom, text)
 
-        painter.setPen(Qt.black)
+        painter.setPen(QtCore.Qt.black)
         drawText(0)
         # Draw the rest of the text
         for i in range(1, shape.TOTAL_LINES + 1):
@@ -115,9 +133,78 @@ class ViewerWidget(QOpenGLWidget):
             drawText(-i, xAxis=False)
 
 
+class Window(QtWidgets.QMainWindow):
+    def __init__(self, parent, stage=None, *args, **kwargs):
+        QtWidgets.QMainWindow.__init__(self, parent=parent, *args, **kwargs)
+        self._view = ViewerWidget()
+        self.setCentralWidget(self._view)
+
+        self.setGeometry(850, 400, 800, 800)
+
+        self._stage = stage
+
+    def addPrimPath(self, primPath, override=False):
+        prim = self._stage.GetPrimAtPath(primPath)
+        if not prim.IsValid():
+            raise RuntimeError("No valid prim at path: {}".format(primName))
+        return self.addPrim(prim, override)
+
+    def addPrim(self, prim, override=False):
+        if override:
+            self._view.clear()
+
+        faceVertCountAttr, uvIndexAttr, uvAttr = self._getRelevantAttributesFromPrim(prim)
+        if not (faceVertCountAttr and uvIndexAttr and uvAttr):
+            return False
+
+        faceVertCountList = faceVertCountAttr.Get()
+        uvIndices = uvIndexAttr.Get()
+        uvValues = uvAttr.Get()
+
+        consumedIndices = 0
+        uvLines = []
+        for faceVertCount in faceVertCountList:
+            faceUVs = []
+            for i in range(faceVertCount):
+                faceVertIndex = consumedIndices + i
+                uvIndex = uvIndices[faceVertIndex]
+                faceUVs.append(uvValues[uvIndex])
+            lines = [
+                faceUVs[0], faceUVs[1], faceUVs[1], faceUVs[2], faceUVs[2], faceUVs[3], faceUVs[3], faceUVs[0]
+            ]
+            flattenedlines = [uv for uvData in lines for uv in uvData]
+            uvLines.extend(flattenedlines)
+            consumedIndices += faceVertCount
+
+        self._view.addShape(shape.UVShape(uvLines))
+
+    @staticmethod
+    def _getRelevantAttributesFromPrim(prim):
+        faceVertCountAttr = prim.GetAttribute("faceVertexCounts")
+        uvIndexAttr = prim.GetAttribute("primvars:st:indices")
+        uvAttr = prim.GetAttribute("primvars:st")
+        return faceVertCountAttr, uvIndexAttr, uvAttr
+
+
+def run(usdviewApi=None, primPath=None):
+    primPath = "/Kitchen_set/Props_grp/DiningTable_grp/KitchenTable_1/Geom/Top"
+
+    if usdviewApi:
+        stage = usdviewApi.stage
+        parent = usdviewApi.qMainWindow
+    else:
+        stage = Usd.Stage.Open("C:\\Libraries\\USD\\share\\usd\\kitchenSet\\Kitchen_set.usd")
+        parent = None
+
+    window = Window(parent=parent, stage=stage)
+    window.show()
+    window.addPrimPath(primPath)
+
+    return window
+
+
 if __name__ == "__main__":
-    QApplication.setAttribute(Qt.AA_UseDesktopOpenGL)
-    app = QApplication([])
-    widget = ViewerWidget()
-    widget.show()
+    QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_UseDesktopOpenGL)
+    app = QtWidgets.QApplication([])
+    window = run()
     app.exec_()

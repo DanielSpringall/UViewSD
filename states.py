@@ -1,10 +1,9 @@
-from PySide2.QtWidgets import QApplication
-from PySide2.QtCore import Qt
+from PySide2 import QtWidgets, QtCore
 import numpy as np
 
 
 def stateFromEvent(event):
-    modifiers = QApplication.keyboardModifiers()
+    modifiers = QtWidgets.QApplication.keyboardModifiers()
     button = event.button()
     for state in [PanState, ZoomState]:
         if state.canEnable(modifiers, button):
@@ -48,11 +47,11 @@ class ZoomState(BaseState):
 
     @staticmethod
     def canEnable(modifiers, button):
-        return modifiers == Qt.AltModifier and button == Qt.RightButton
+        return modifiers == QtCore.Qt.AltModifier and button == QtCore.Qt.RightButton
 
     @staticmethod
     def shouldDisable(button):
-        return button == Qt.RightButton
+        return button == QtCore.Qt.RightButton
 
     def update(self, event):
         [xPos, yPos] = self.glScreenPosition(event)
@@ -74,11 +73,11 @@ class PanState(BaseState):
 
     @staticmethod
     def canEnable(modifiers, button):
-        return modifiers == Qt.AltModifier and button == Qt.MiddleButton
+        return modifiers == QtCore.Qt.AltModifier and button == QtCore.Qt.LeftButton
 
     @staticmethod
     def shouldDisable(button):
-        return button == Qt.MiddleButton
+        return button == QtCore.Qt.LeftButton
 
     def update(self, event):
         [xPos, yPos] = self.glScreenPosition(event)

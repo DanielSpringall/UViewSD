@@ -1,7 +1,8 @@
 from ctypes import c_void_p
-from shader import ShaderProgram
 from OpenGL import GL
 import numpy as np
+
+import shader
 
 
 class BaseShape:
@@ -48,56 +49,45 @@ class BaseShape:
 
 
 class UVShape:
-    def __init__(self):
+    def __init__(self, lines):
         BaseShape.__init__(self)
 
-        self._shader = ShaderProgram(vertexShaderName="line", fragmentShaderName="line")
+        self.bound = False
+        self._vao = None
+        self._colour = (1.0, 1.0, 1.0)
+        self._shader = None
+        self._lines = np.array(lines, dtype=np.float32)
+        self._numLines = int(len(self._lines) / 2)
 
-        uvLines = [
-            0.2, 0.2,
-            0.5, 0.8,
-            0.5, 0.8,
-            0.8, 0.2,
-            0.8, 0.2,
-            0.2, 0.2
-        ]
-
-        baseColour = (1.0, 1.0, 1.0)
-        self._lineData = [
-            self.initializeGLData(np.array(uvLines, dtype=np.float32), colour=baseColour),
-        ]
-
-    def initializeGLData(self, lineData, colour):
-        vao = GL.glGenVertexArrays(1)
+    def initializeGLData(self):
+        self._shader = shader.ShaderProgram(vertexShaderName="line", fragmentShaderName="line")
+        self._vao = GL.glGenVertexArrays(1)
         pbo = GL.glGenBuffers(1)
 
-        GL.glBindVertexArray(vao)
+        GL.glBindVertexArray(self._vao)
         GL.glBindBuffer(GL.GL_ARRAY_BUFFER, pbo)
 
         GL.glEnableVertexAttribArray(0)
         GL.glVertexAttribPointer(0, 2, GL.GL_FLOAT, GL.GL_FALSE, 0, c_void_p(0))
 
-        GL.glBufferData(GL.GL_ARRAY_BUFFER, lineData.nbytes, lineData, GL.GL_STATIC_DRAW)
+        GL.glBufferData(GL.GL_ARRAY_BUFFER, self._lines.nbytes, self._lines, GL.GL_STATIC_DRAW)
 
+        GL.glBindBuffer(GL.GL_ARRAY_BUFFER, 0)
         GL.glBindVertexArray(0)
-
-        data = {
-            "vao": vao,
-            "numVerts": int(len(lineData) / 2),
-            "colour": colour
-        }
-        return data
+        self.bound = True
 
     def draw(self, projectionMatrix):
+        if not self.bound:
+            self.initializeGLData()
+
         self._shader.use()
         self._shader.setMatrix4f("viewMatrix", projectionMatrix)
 
         GL.glLineWidth(1.0)
-        for data in self._lineData:
-            GL.glBindVertexArray(data["vao"])
-            self._shader.setVec3f("colour", data["colour"])
-            GL.glDrawArrays(GL.GL_LINES, 0, data["numVerts"])
-            GL.glBindVertexArray(0)
+        GL.glBindVertexArray(self._vao)
+        self._shader.setVec3f("colour", self._colour)
+        GL.glDrawArrays(GL.GL_LINES, 0, self._numLines)
+        GL.glBindVertexArray(0)
 
 
 NUM_GRIDS_FROM_ORIGIN = 5
@@ -108,7 +98,7 @@ class Grid:
     def __init__(self):
         BaseShape.__init__(self)
 
-        self._shader = ShaderProgram(vertexShaderName="line", fragmentShaderName="line")
+        self._shader = shader.ShaderProgram(vertexShaderName="line", fragmentShaderName="line")
 
         incrementalLines = []
         unitLines = []
@@ -160,6 +150,7 @@ class Grid:
 
         GL.glBufferData(GL.GL_ARRAY_BUFFER, lineData.nbytes, lineData, GL.GL_STATIC_DRAW)
 
+        GL.glBindBuffer(GL.GL_ARRAY_BUFFER, 0)
         GL.glBindVertexArray(0)
 
         data = {
