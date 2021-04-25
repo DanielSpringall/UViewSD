@@ -1,11 +1,14 @@
 from OpenGL import GL
 from PySide2 import QtWidgets, QtGui, QtCore
 import numpy as np
-from pxr import Usd
+from pxr import Usd, UsdGeom
 
 import shape
 import states
 import camera
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class ViewerWidget(QtWidgets.QOpenGLWidget):
@@ -24,8 +27,10 @@ class ViewerWidget(QtWidgets.QOpenGLWidget):
             # pass
         self._shapes = []
 
-    def addShape(self, shape):
-        self._shapes.append(shape)
+    def addShapes(self, shapes):
+        if not isinstance(shapes, list):
+            shapes = [shapes]
+        self._shapes.extend(shapes)
         self.update()
 
     def removeShape(self):
@@ -143,42 +148,34 @@ class Window(QtWidgets.QMainWindow):
         self.setGeometry(850, 400, 800, 800)
 
         self._usdviewApi = usdviewApi
+        if usdviewApi:
+            self._usdviewApi.dataModel.selection.signalPrimSelectionChanged.connect(self.selectionChanged)
         self._stage = stage
 
-    def addPrimPath(self, primPath, override=False):
-        prim = self._stage.GetPrimAtPath(primPath)
-        if not prim.IsValid():
-            raise RuntimeError("No valid prim at path: {}".format(primName))
-        return self.addPrim(prim, override)
+    def addPrimPaths(self, primPaths, override=False):
+        prims = []
+        for primPath in primPaths:
+            prim = self._stage.GetPrimAtPath(primPath)
+            if not prim.IsValid():
+                logger.error("No valid prim at path: %s", primPath)
+                continue
+            prims.append(prim)
+        return self.addPrims(prims, override)
 
-    def addPrim(self, prim, override=False):
+    def addPrims(self, prims, override=False):
         if override:
             self._view.clear()
 
-        faceVertCountAttr, uvIndexAttr, uvAttr = self._getRelevantAttributesFromPrim(prim)
-        if not (faceVertCountAttr and uvIndexAttr and uvAttr):
-            return False
-
-        faceVertCountList = faceVertCountAttr.Get()
-        uvIndices = uvIndexAttr.Get()
-        uvValues = uvAttr.Get()
-
-        consumedIndices = 0
-        uvLines = []
-        for faceVertCount in faceVertCountList:
-            lines = []
-            for i in range(faceVertCount):
-                edgeStartIndex = consumedIndices + i
-                edgeEndIndex = consumedIndices if i  == (faceVertCount - 1) else edgeStartIndex + 1
-                lines.extend([uvValues[uvIndices[edgeStartIndex]], uvValues[uvIndices[edgeEndIndex]]])
-            flattenedlines = [uv for uvData in lines for uv in uvData]
-            uvLines.extend(flattenedlines)
-            consumedIndices += faceVertCount
-
-        self._view.addShape(shape.UVShape(uvLines))
+        shapes = []
+        for prim in prims:
+            shape = self._setupPrimShape(prim)
+            if shape:
+                shapes.append(shape)
+            else:
+                logger.warning("Unable to extract uv data from %s.", prim)
+        self._view.addShapes(shapes)
 
     def keyPressEvent(self, event):
-        print("window.keyPressEvent")
         if event.key() == QtCore.Qt.Key_R and self._usdviewApi:
             for path in self._usdviewApi.selectedPaths:
                 self._view.clear()
@@ -186,19 +183,74 @@ class Window(QtWidgets.QMainWindow):
 
         QtWidgets.QMainWindow.keyPressEvent(self, event)
 
-    @staticmethod
-    def _getRelevantAttributesFromPrim(prim):
-        faceVertCountAttr = prim.GetAttribute("faceVertexCounts")
-        uvIndexAttr = prim.GetAttribute("primvars:st:indices")
-        uvAttr = prim.GetAttribute("primvars:st")
-        return faceVertCountAttr, uvIndexAttr, uvAttr
+    def _setupPrimShape(self, prim, uvName="st"):
+        mesh = UsdGeom.Mesh(prim)
+        if not mesh:
+            logger.warning("Invalid mesh prim \"%s\".", prim)
 
-    def test(self, *args, **kwargs):
-        print("In here!!!")
+        faceVertCountAttr = mesh.GetFaceVertexCountsAttr()
+        if not faceVertCountAttr:
+            logger.warning("Missing face vertex count attribute on \"%s\"", prim)
+            return None
+
+        faceVertIndicesAttr = mesh.GetFaceVertexIndicesAttr()
+        if not faceVertIndicesAttr:
+            logger.warning("Missing face vertex indices attribute on \"%s\"", prim)
+            return None
+
+        uvPrimvar = mesh.GetPrimvar(uvName)
+        if not UsdGeom.Primvar.IsPrimvar(uvPrimvar):
+            logger.warning("Invalid primvar name \"%s\" on \"%s\".", uvName, prim)
+            return None
+
+        faceVertCountList = faceVertCountAttr.Get()
+        uvValues = uvPrimvar.Get()
+        uvIndices = uvPrimvar.GetIndices()
+        faceVertexIndices = faceVertIndicesAttr.Get()
+
+        interpolation = uvPrimvar.GetInterpolation()
+        if interpolation == UsdGeom.Tokens.faceVarying:
+            consumedIndices = 0
+            uvLines = []
+            for faceVertCount in faceVertCountList:
+                lines = []
+                for i in range(faceVertCount):
+                    edgeStartIndex = consumedIndices + i
+                    edgeEndIndex = consumedIndices if i  == (faceVertCount - 1) else edgeStartIndex + 1
+                    lines.extend([uvValues[uvIndices[edgeStartIndex]], uvValues[uvIndices[edgeEndIndex]]])
+                flattenedlines = [uv for uvData in lines for uv in uvData]
+                uvLines.extend(flattenedlines)
+                consumedIndices += faceVertCount
+            return shape.UVShape(uvLines)
+        elif interpolation == UsdGeom.Tokens.vertex:
+            consumedIndices = 0
+            uvLines = []
+            for faceVertCount in faceVertCountList:
+                lines = []
+                for i in range(faceVertCount):
+                    edgeStartIndex = consumedIndices + i
+                    edgeEndIndex = consumedIndices if i  == (faceVertCount - 1) else edgeStartIndex + 1
+
+                    edgeStartIndex = faceVertexIndices[edgeStartIndex]
+                    edgeEndIndex = faceVertexIndices[edgeEndIndex]
+
+                    lines.extend([uvValues[uvIndices[edgeStartIndex]], uvValues[uvIndices[edgeEndIndex]]])
+                flattenedlines = [uv for uvData in lines for uv in uvData]
+                uvLines.extend(flattenedlines)
+                consumedIndices += faceVertCount
+            return shape.UVShape(uvLines)
+
+        raise RuntimeError("Invalid interpolation ({}) for uv data.".format(interpolation))
+
+    def selectionChanged(self, *args, **kwargs):
+        selectedPaths = self._usdviewApi.selectedPaths
+        if selectedPaths:
+            self.addPrimPaths(selectedPaths, override=True)
+        else:
+            self._view.clear()
 
 
 def run(usdviewApi=None, primPath=None):
-
     if usdviewApi:
         stage = usdviewApi.stage
         parent = usdviewApi.qMainWindow
@@ -208,11 +260,12 @@ def run(usdviewApi=None, primPath=None):
 
     window = Window(parent=parent, stage=stage, usdviewApi=usdviewApi)
     window.show()
-    if usdviewApi:
-        usdviewApi.dataModel.signalPrimsChanged.connect(window.test)
-    # primPath = "/Kitchen_set/Props_grp/DiningTable_grp/KitchenTable_1/Geom/Top"
-    # window.addPrimPath(primPath)
+    # primPath = "/Kitchen_set/Props_grp/North_grp/FridgeArea_grp/Refridgerator_1/Geom/Decorations/pPlane98"
     # primPath = "/Kitchen_set/Arch_grp/Kitchen_1/Geom/Sink_Curtain/nurbsToPoly22"
+    # TODO: Work out why this prim fails to load
+    if not usdviewApi:
+        primPath = "/Kitchen_set/Arch_grp/Kitchen_1/Geom/TileFloor/pPlane215"
+        window.addPrimPaths([primPath])
     # window.addPrimPath(primPath)
 
     return window

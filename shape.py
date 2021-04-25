@@ -5,53 +5,8 @@ import numpy as np
 import shader
 
 
-class BaseShape:
-    def __init__(self):
-        self._positions = None
-        self._indices = None
-        self._numVertices = None
-
-        self._shader = None
-
-        self._vao = None
-        self._pbo = None
-        self._uvbo = None
-
-    def initializeGLData(self):
-        self._vao = GL.glGenVertexArrays(1)
-        [self._pbo, self._uvbo, ebo] = GL.glGenBuffers(3)
-
-        GL.glBindVertexArray(self._vao)
-
-        GL.glBindBuffer(GL.GL_ARRAY_BUFFER, self._pbo)
-        GL.glBufferData(GL.GL_ARRAY_BUFFER, self._positions.nbytes, self._positions, GL.GL_STATIC_DRAW)
-
-        GL.glBindBuffer(GL.GL_ARRAY_BUFFER, self._uvbo)
-        GL.glBufferData(GL.GL_ARRAY_BUFFER, self._uvs.nbytes, self._uvs, GL.GL_STATIC_DRAW)
-
-        GL.glBindBuffer(GL.GL_ELEMENT_ARRAY_BUFFER, ebo)
-        GL.glBufferData(GL.GL_ELEMENT_ARRAY_BUFFER, self._indices.nbytes, self._indices, GL.GL_STATIC_DRAW)
-
-        GL.glEnableVertexAttribArray(0)
-        GL.glVertexAttribPointer(0, 2, GL.GL_FLOAT, GL.GL_FALSE, 0, c_void_p(0))
-        GL.glEnableVertexAttribArray(1)
-        GL.glVertexAttribPointer(1, 2, GL.GL_FLOAT, GL.GL_FALSE, 0, c_void_p(0))
-
-        GL.glBindVertexArray(0); 
-
-    def draw(self, projectionMatrix):
-        self._shader.use()
-        self._shader.setMatrix4f("viewMatrix", projectionMatrix)
-
-        GL.glBindVertexArray(self._vao)
-        GL.glDrawElements(GL.GL_TRIANGLES, self._numVertices, GL.GL_UNSIGNED_INT, c_void_p(0))
-        GL.glBindVertexArray(0)
-
-
 class UVShape:
     def __init__(self, lines):
-        BaseShape.__init__(self)
-
         self.bound = False
         self._vao = None
         self._colour = (1.0, 1.0, 1.0)
@@ -96,8 +51,6 @@ TOTAL_LINES = NUM_GRIDS_FROM_ORIGIN * LINE_INTERVALS
 
 class Grid:
     def __init__(self):
-        BaseShape.__init__(self)
-
         self._shader = shader.ShaderProgram(vertexShaderName="line", fragmentShaderName="line")
 
         incrementalLines = []
