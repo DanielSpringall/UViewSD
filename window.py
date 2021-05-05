@@ -37,9 +37,14 @@ class ViewerWidget(QtWidgets.QOpenGLWidget):
         pass
 
     def keyPressEvent(self, event):
-        print("ViewerWidget.keyPressEvent")
         if event.key() == QtCore.Qt.Key_F:
             self._camera.focus(0, 1, 1, 0)
+            self.update()
+        if event.key() == QtCore.Qt.Key_1:
+            self._camera.zoom([0.5, 0.5], 0.9)
+            self.update()
+        if event.key() == QtCore.Qt.Key_2:
+            self._camera.zoom([0.5, 0.5], 1.1)
             self.update()
 
     def mousePressEvent(self, event):
@@ -62,9 +67,10 @@ class ViewerWidget(QtWidgets.QOpenGLWidget):
 
         pos = event.pos()
         screenCoords = [pos.x() / self.width(), pos.y() / self.height()]
+        worldCoords = self._camera.mapScreenToWorld(screenCoords)
         delta = event.angleDelta().y()
         zoomAmount = 1 + (delta and delta // abs(delta)) * 0.03
-        self._camera.zoom(screenCoords, zoomAmount)
+        self._camera.zoom(worldCoords, zoomAmount)
         self.update()
 
     def addShape(self, shape):
@@ -90,7 +96,7 @@ class ViewerWidget(QtWidgets.QOpenGLWidget):
         GL.glClearColor(0.3, 0.3, 0.3, 1.0)
         GL.glClear(GL.GL_COLOR_BUFFER_BIT)
 
-        projectionMatrix = self._camera.projectionMatrix()
+        projectionMatrix = self._camera.glProjectionMatrix()
         self._background.draw(projectionMatrix)
         for shape in self._shapes:
             shape.draw(projectionMatrix)
@@ -102,11 +108,11 @@ class ViewerWidget(QtWidgets.QOpenGLWidget):
     def drawText(self, painter):
         screenCoord = [0.5, 0.5]
 
-        originCoord = self._camera.worldToScreenCoord([0.0, 0.0])
+        originCoord = self._camera.mapWorldToScreen([0.0, 0.0])
         originCoord[0] = originCoord[0] * self.width()
         originCoord[1] = originCoord[1] * self.height()
 
-        offsetCoord = self._camera.worldToScreenCoord([0.1, 0.1])
+        offsetCoord = self._camera.mapWorldToScreen([0.1, 0.1])
         offsetCoord[0] = offsetCoord[0] * self.width()
         offsetCoord[1] = offsetCoord[1] * self.height()
 
@@ -176,12 +182,11 @@ class Window(QtWidgets.QMainWindow):
         self._view.addShapes(shapes)
 
     def keyPressEvent(self, event):
+        self._view.keyPressEvent(event)
         if event.key() == QtCore.Qt.Key_R and self._usdviewApi:
             for path in self._usdviewApi.selectedPaths:
                 self._view.clear()
                 self.addPrimPath(path)
-
-        QtWidgets.QMainWindow.keyPressEvent(self, event)
 
     def _setupPrimShape(self, prim, uvName="st"):
         mesh = UsdGeom.Mesh(prim)

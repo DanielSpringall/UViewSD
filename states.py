@@ -22,7 +22,7 @@ class BaseState:
     def glScreenPosition(self, event):
         position = event.pos()
         screenCoords = [position.x() / self._width, position.y() / self._height]
-        return self._camera.screenToGlCoord(screenCoords)
+        return self._camera.mapScreenToGl(screenCoords)
 
     @staticmethod
     def canEnable(modifiers, button):
@@ -40,10 +40,9 @@ class ZoomState(BaseState):
     def __init__(self, event, camera, width, height):
         BaseState.__init__(self, event, camera, width, height)
         pos = event.pos()
-        worldCoords = self._camera.screenToWorldCoord([pos.x()/width, pos.y()/height])
-        self._transMat = np.matrix.transpose(self._camera.createTransformationMatrix(-worldCoords[0], -worldCoords[1]))
-        self._invTransMat = np.matrix.transpose(self._camera.createTransformationMatrix(worldCoords[0], worldCoords[1]))
-        self._initProjMat = np.matrix.transpose(self._initProjMat)
+        worldCoords = self._camera.mapScreenToWorld([pos.x()/width, pos.y()/height])
+        self._transMat = self._camera.createTransformationMatrix(-worldCoords[0], -worldCoords[1])
+        self._invTransMat = np.linalg.inv(self._transMat)
 
     @staticmethod
     def canEnable(modifiers, button):
