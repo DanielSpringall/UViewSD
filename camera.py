@@ -121,7 +121,7 @@ class Camera2D:
         if scaleAmount == 1.0:
             return matrixToScale
 
-        scaleMatrix = cls.scaleMatrix(scaleAmount)
+        scaleMatrix = cls.createScaleMatrix(scaleAmount)
         if coord[0] == 0.0 and coord[1] == 0.0:
             return matrixToScale.dot(scaleMatrix)
         else:    
@@ -210,7 +210,7 @@ class Camera2D:
         return matrix
 
     @staticmethod
-    def scaleMatrix(scale):
+    def createScaleMatrix(scale):
         """ Utility method to generate a uniformly scaled 2D 4x4 matrix.
 
         Args:

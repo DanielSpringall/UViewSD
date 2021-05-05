@@ -17,12 +17,17 @@ class BaseState:
         self._initProjMat = self._camera._projMat
         self._width = width
         self._height = height
-        [self._initXPos, self._initYPos] = self.glScreenPosition(event)
+        [self._initX, self._initY] = self.glScreenCoord(event)
 
-    def glScreenPosition(self, event):
+    def glScreenCoord(self, event):
         position = event.pos()
         screenCoords = [position.x() / self._width, position.y() / self._height]
         return self._camera.mapScreenToGl(screenCoords)
+
+    def worldCoord(self, event):
+        position = event.pos()
+        screenCoords = [position.x() / self._width, position.y() / self._height]
+        return self._camera.mapScreenToWorld(screenCoords)
 
     @staticmethod
     def canEnable(modifiers, button):
@@ -39,10 +44,7 @@ class BaseState:
 class ZoomState(BaseState):
     def __init__(self, event, camera, width, height):
         BaseState.__init__(self, event, camera, width, height)
-        pos = event.pos()
-        worldCoords = self._camera.mapScreenToWorld([pos.x()/width, pos.y()/height])
-        self._transMat = self._camera.createTransformationMatrix(-worldCoords[0], -worldCoords[1])
-        self._invTransMat = np.linalg.inv(self._transMat)
+        [self._initX, self._initY] = self.worldCoord(event)
 
     @staticmethod
     def canEnable(modifiers, button):
@@ -53,15 +55,11 @@ class ZoomState(BaseState):
         return button == QtCore.Qt.RightButton
 
     def update(self, event):
-        [xPos, yPos] = self.glScreenPosition(event)
-        xZoom = xPos - self._initXPos
-        yZoom = self._initYPos - yPos
+        [xPos, yPos] = self.worldCoord(event)
+        xZoom = xPos - self._initX
+        yZoom = self._initY - yPos
         zoomAmount = 1 + (xZoom + yZoom) / 2
-
-        zoomedProjectionMatrix = np.matrix.transpose(
-            self._camera.scaleMatrix(self._initProjMat, zoomAmount, self._transMat, self._invTransMat)
-        )
-
+        zoomedProjectionMatrix = self._camera.scaleMatrixAroundPoint(self._initProjMat, zoomAmount, [self._initX, self._initY])
         self._camera.setProjectionMatrix(zoomedProjectionMatrix)
         return True
 
@@ -69,22 +67,21 @@ class ZoomState(BaseState):
 class PanState(BaseState):
     def __init__(self, event, camera, width, height):
         BaseState.__init__(self, event, camera, width, height)
+        self._scale = self._initProjMat[0][0]
 
     @staticmethod
     def canEnable(modifiers, button):
-        return modifiers == QtCore.Qt.AltModifier and button == QtCore.Qt.LeftButton
+        return modifiers == QtCore.Qt.AltModifier and button == QtCore.Qt.MiddleButton
 
     @staticmethod
     def shouldDisable(button):
-        return button == QtCore.Qt.LeftButton
+        return button == QtCore.Qt.MiddleButton
 
     def update(self, event):
-        [xPos, yPos] = self.glScreenPosition(event)
-
+        [x, y] = self.glScreenCoord(event)
         transformMatrix = self._camera.createTransformationMatrix(
-            xPos - self._initXPos,
-            yPos - self._initYPos
+            (x - self._initX) / self._scale,
+            (y - self._initY) / self._scale
         )
-        projMat = np.matmul(self._initProjMat, transformMatrix)
-        self._camera.setProjectionMatrix(projMat)
+        self._camera.setProjectionMatrix(np.matmul(self._initProjMat, transformMatrix))
         return True

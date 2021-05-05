@@ -22,12 +22,18 @@ class ViewerWidget(QtWidgets.QOpenGLWidget):
         self._camera = None
 
     def clear(self):
+        """ Clear all the uv shapes being drawn in the scene. """
         # for shape in self._shapes:
             # Do something to shapes?
             # pass
         self._shapes = []
 
     def addShapes(self, shapes):
+        """ Add a list of shapes to be drawn in the scene and refresh the view. 
+        
+        Args:
+            shapes (list[shape.UVShape]): List of shapes to draw.
+        """
         if not isinstance(shapes, list):
             shapes = [shapes]
         self._shapes.extend(shapes)
@@ -45,6 +51,18 @@ class ViewerWidget(QtWidgets.QOpenGLWidget):
             self.update()
         if event.key() == QtCore.Qt.Key_2:
             self._camera.zoom([0.5, 0.5], 1.1)
+            self.update()
+        if event.key() == QtCore.Qt.Key_Left:
+            self._camera.pan(-0.5, 0.0)
+            self.update()
+        if event.key() == QtCore.Qt.Key_Right:
+            self._camera.pan(0.5, 0.0)
+            self.update()
+        if event.key() == QtCore.Qt.Key_Down:
+            self._camera.pan(0.0, -0.5)
+            self.update()
+        if event.key() == QtCore.Qt.Key_Up:
+            self._camera.pan(0.0, 0.5)
             self.update()
 
     def mousePressEvent(self, event):
@@ -73,23 +91,19 @@ class ViewerWidget(QtWidgets.QOpenGLWidget):
         self._camera.zoom(worldCoords, zoomAmount)
         self.update()
 
-    def addShape(self, shape):
-        self._shapes.append(shape)
-        self.update()
-
-    def removeShape(self, shape):
-        pass
-
     def initializeGL(self):
+        """ Setup GL objects for the view ready for drawing. """
         self._background = shape.Grid()
         self._camera = camera.Camera2D(self.width(), self.height())
         self._painter = QtGui.QPainter()
 
     def resizeGL(self, width, height):
+        """ Resize the GL viewport and update the camera with the new dimensions. """
         GL.glViewport(0, 0, width, height)
         self._camera.resize(width, height)
 
     def paintGL(self):
+        """ Paint all the GL objects in the scene. """
         self._painter.begin(self)
 
         self._painter.beginNativePainting()
@@ -106,6 +120,7 @@ class ViewerWidget(QtWidgets.QOpenGLWidget):
         self._painter.end()
 
     def drawText(self, painter):
+        """ Pain the grid values in the scene. """
         screenCoord = [0.5, 0.5]
 
         originCoord = self._camera.mapWorldToScreen([0.0, 0.0])
