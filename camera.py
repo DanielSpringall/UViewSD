@@ -84,8 +84,17 @@ class Camera2D:
         Return:
             (list[float, float]): The mapped world co-ordinate.
         """
-        glCoord = self.mapScreenToGl(coord)
-        glScreenPosition = np.array([glCoord[0], glCoord[1], 0.0, 1.0])
+        return self.mapGlToWorld(self.mapScreenToGl(coord))
+
+    def mapGlToWorld(self, coord):
+        """ Map a GL screen co-ordinate to its corresponding world co-ordinate.
+
+        Args:
+            coord (list[float, float]): The GL screen co-ordinate to map from.
+        Return:
+            (list[float, float]): The mapped world co-ordinate.
+        """
+        glScreenPosition = np.array([coord[0], coord[1], 0.0, 1.0])
         return self._invProj_aspectRatio.dot(glScreenPosition)[:2]
 
     def mapWorldToScreen(self, coord):
@@ -110,23 +119,34 @@ class Camera2D:
         self.setProjectionMatrix(self.scaleMatrixAroundPoint(self.projectionMatrix(), amount, coord))
 
     @classmethod
-    def scaleMatrixAroundPoint(cls, matrixToScale, scaleAmount, coord):
-        """ Utility method to scale a matrix around a given co-ordinate.
+    def scaleMatrixAroundPoint(cls, matrixToScale, scaleAmount, coord, minScaleAmount=0.01):
+        """ Utility method to uniformly scale a matrix around a given co-ordinate.
 
         Args:
             matrixToScale (np.matrix(4x4)): The matrix to scale.
             scaleAmount (float): The amount to multiply the current matrices scale by.
             coord (list[float, float]): The co-ordinate to scale the matrix around.
+            minScaleAmount (float): The minimum scale allowed to help prevent flipping.
         """
-        if scaleAmount == 1.0:
+        currentScaleAmount = matrixToScale[0][0]
+        if scaleAmount == 1.0 or currentScaleAmount <= minScaleAmount:
             return matrixToScale
 
-        scaleMatrix = cls.createScaleMatrix(scaleAmount)
+        resultingScaleAmount = currentScaleAmount * scaleAmount
+        if resultingScaleAmount <= minScaleAmount:
+            resultingScaleAmount = minScaleAmount
+
         if coord[0] == 0.0 and coord[1] == 0.0:
-            return matrixToScale.dot(scaleMatrix)
+            matrixToScale[0][0] = resultingScaleAmount
+            matrixToScale[1][1] = resultingScaleAmount
         else:    
             translationMatrix = cls.createTransformationMatrix(coord[0], coord[1])
-            return matrixToScale.dot(translationMatrix).dot(scaleMatrix).dot(np.linalg.inv(translationMatrix))
+            matrixToScale = matrixToScale.dot(translationMatrix)
+            matrixToScale[0][0] = resultingScaleAmount
+            matrixToScale[1][1] = resultingScaleAmount
+            matrixToScale = matrixToScale.dot(np.linalg.inv(translationMatrix))
+
+        return matrixToScale
 
     def resize(self, width, height):
         """ Resize the camera output image.
