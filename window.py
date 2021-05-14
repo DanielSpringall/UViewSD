@@ -20,7 +20,7 @@ class ViewerWidget(QtWidgets.QOpenGLWidget):
         self._painter = None
         self._activeState = None
         self._backgroundGrid = None
-        self._shapes = []
+        self._shapes = {}
         self._camera = None
         self._showGrid = True
 
@@ -28,26 +28,34 @@ class ViewerWidget(QtWidgets.QOpenGLWidget):
         self._showGrid = not self._showGrid
         self.update()
 
-    def clear(self):
-        """ Clear all the uv shapes being drawn in the scene. """
-        # for shape in self._shapes:
-            # Do something to shapes?
-            # pass
-        self._shapes = []
+    def removeAllShapes(self):
+        if self._shapes:
+            self._shapes = {}
+            self.update()
 
     def addShapes(self, shapes):
         """ Add a list of shapes to be drawn in the scene and refresh the view. 
         
         Args:
-            shapes (list[shape.UVShape]): List of shapes to draw.
+            shapes (dict{name: shape.UVShape}):
+                Dictionary of the shapes to draw. Keys are the identifiers for each shape, values are the shape data.
         """
-        if not isinstance(shapes, list):
-            shapes = [shapes]
-        self._shapes.extend(shapes)
+        for shapeName in shapes:
+            if shapeName in self._shapes:
+                continue
+            self._shapes[shapeName] = shapes[shapeName]
         self.update()
 
-    def removeShape(self):
-        pass
+    def removeShapes(self, shapeNames):
+        itemRemoved = False
+        for shapeName in shapeNames:
+            if shapeName not in self._shapes:
+                continue
+            del self._shapes[shapeName]
+            itemRemoved = True
+
+        if itemRemoved:
+            self.update()
 
     def keyPressEvent(self, event):
         if event.key() == QtCore.Qt.Key_F:
@@ -183,6 +191,8 @@ class Window(QtWidgets.QMainWindow):
         self._uvOptionsComboBox = None
         self._uvNameLockButton = None
 
+        self._meshes = []
+
         self._setupUI()
         self._setupConnections()
 
@@ -270,11 +280,15 @@ class Window(QtWidgets.QMainWindow):
 
         shapes = []
         for prim in prims:
+            for mesh in self._meshes:
+                if prim == mesh.prim():
+                    continue
+
             mesh = UsdGeom.Mesh(prim)
-            if not UsdUVMeshReader.validMesh(mesh):
+            if not MeshUVs.validMesh(mesh):
                 continue
 
-            uvData = UsdUVMeshReader(mesh)
+            uvData = MeshUVs(mesh)
             [positions, indices] = uvData.uvData("st")
             if positions is None or indices is None:
                 continue
@@ -283,7 +297,13 @@ class Window(QtWidgets.QMainWindow):
             for index in indices:
                 lines.extend(positions[index])
             shapes.append(shape.UVShape(lines))
+            self._meshes.extend
         self._view.addShapes(shapes)
+
+    def updateView(self):
+        if not self._meshes:
+            return
+        
 
     def keyPressEvent(self, event):
         self._view.keyPressEvent(event)
@@ -298,88 +318,6 @@ class Window(QtWidgets.QMainWindow):
             self.addPrimPaths(selectedPaths, override=True)
         else:
             self._view.clear()
-
-
-class UsdUVMeshReader:
-    def __init__(self, mesh):
-        self._mesh = mesh
-        self._validUVNames = self._getValidUVNames(self._mesh)
-        self._uvData = {} # {uvName1: [positions, indices], ...}
-
-    @staticmethod
-    def validMesh(mesh):
-        if not mesh:
-            logger.debug("Invalid mesh for uv data. %s.", mesh)
-            return False
-        if not mesh.GetFaceVertexCountsAttr():
-            logger.debug("Invalid mesh for uv data. %s. Missing face vertex count attribute.", mesh)
-            return False
-        if not mesh.GetFaceVertexIndicesAttr():
-            logger.debug("Invalid mesh for uv data. %s. Missing face vertex indices attribute.", mesh)
-            return False
-        return True
-
-    @staticmethod
-    def _getValidUVNames(mesh):
-        validUVNames = []
-        for primvar in mesh.GetPrimvars():
-            if primvar.GetTypeName() not in ["texCoord2f[]", "float2[]"]:
-                continue
-            validUVNames.append(primvar.GetPrimvarName())
-        return(validUVNames)
-
-    def reset(self):
-        self._validUVNames = self._getValidUVNames(self._mesh)
-        self._uvData = {}
-
-    def uvData(self, uvName):
-        if uvName not in self._validUVNames:
-            logger.debug("%s not a valid uv name. Valid names: %s.", uvName, self._validUVNames)
-            return [None, None]
-        if uvName not in self._uvData:
-            primvar = self._mesh.GetPrimvar(uvName)
-            interpolation = primvar.GetInterpolation()
-            if interpolation == UsdGeom.Tokens.faceVarying:
-                self._uvData[uvName] = self._getFaceVaryingUVs(primvar)
-            elif interpolation == UsdGeom.Tokens.vertex:
-                self._uvData[uvName] = self._getVertexVaryingUVs(primvar)
-            else:
-                logger.error("Invalid interpolation (%s) for uv data.", interpolation)
-                return [None, None]
-        return self._uvData[uvName]
-
-    def _getFaceVaryingUVs(self, primvar):
-        faceVertCountList = self._mesh.GetFaceVertexCountsAttr().Get()
-        uvPositions = primvar.Get()
-        uvIndices = primvar.GetIndices()
-        return [uvPositions, self._createUVEdges(faceVertCountList, [uvIndices])]
-
-    def _getVertexVaryingUVs(self, primvar):
-        faceVertCountList = self._mesh.GetFaceVertexCountsAttr().Get()
-        faceVertexIndices = self._mesh.GetFaceVertexIndicesAttr().Get()
-        uvPositions = primvar.Get()
-        uvIndices = primvar.GetIndices()
-        uvIndexMaps = [faceVertexIndices]
-        if uvIndices:
-            uvIndexMaps.append(uvIndices)
-        edges = self._createUVEdges(faceVertCountList, uvIndexMaps)
-        return [uvPositions, edges]
-
-    @staticmethod
-    def _createUVEdges(faceVertCountList, indexMaps):
-        edges = []
-        consumedIndices = 0
-        for faceVertCount in faceVertCountList:
-            for i in range(faceVertCount):
-                firstIndex = consumedIndices + i
-                secondIndex = consumedIndices if i  == (faceVertCount - 1) else firstIndex + 1
-                for indexMap in indexMaps:
-                    firstIndex = indexMap[firstIndex]
-                    secondIndex = indexMap[secondIndex]
-                edges.append(firstIndex)
-                edges.append(secondIndex)
-            consumedIndices += faceVertCount
-        return edges
 
 
 def run(usdviewApi=None, primPath=None):
