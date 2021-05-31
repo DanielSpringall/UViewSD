@@ -101,11 +101,11 @@ class PanState(BaseState):
 
     @staticmethod
     def canEnable(modifiers, button):
-        return modifiers == QtCore.Qt.AltModifier and button == QtCore.Qt.MiddleButton
+        return modifiers == QtCore.Qt.AltModifier and button == QtCore.Qt.LeftButton
 
     @staticmethod
     def shouldDisable(button):
-        return button == QtCore.Qt.MiddleButton
+        return button == QtCore.Qt.LeftButton
 
     def update(self, event):
         screenCoord = self._glScreenCoord(event)

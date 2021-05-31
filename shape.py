@@ -1,8 +1,12 @@
 from ctypes import c_void_p
 from OpenGL import GL
 import numpy as np
+from pxr import UsdGeom
 
 import shader
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 class UVShape:
@@ -48,8 +52,7 @@ class UVShape:
 class MeshUVs:
     def __init__(self, mesh):
         self._mesh = mesh
-        self._validUVNames = self._getValidUVNames(self._mesh)
-        self._uvData = {} # {uvName1: [positions, indices], ...}
+        self._validUVNames = None
 
     def prim(self):
         return self._mesh.GetPrim()
@@ -74,33 +77,37 @@ class MeshUVs:
             if primvar.GetTypeName() not in ["texCoord2f[]", "float2[]"]:
                 continue
             validUVNames.append(primvar.GetPrimvarName())
-        return(validUVNames)
+        return validUVNames
 
-    def reset(self):
-        self._validUVNames = self._getValidUVNames(self._mesh)
-        self._uvData = {}
+    def validUVNames(self):
+        if self._validUVNames is None:
+            self._validUVNames = self._getValidUVNames(self._mesh)
+        return self._validUVNames
+
+    def isUVNameValid(self, uvName):
+        return uvName in self.validUVNames()
 
     def uvData(self, uvName):
-        if uvName not in self._validUVNames:
-            logger.debug("%s not a valid uv name. Valid names: %s.", uvName, self._validUVNames)
+        if not self.isUVNameValid(uvName):
+            logger.debug("%s not a valid uv name for %s. Valid names: %s.", uvName, self._mesh, self.validUVNames())
             return [None, None]
-        if uvName not in self._uvData:
-            primvar = self._mesh.GetPrimvar(uvName)
-            interpolation = primvar.GetInterpolation()
-            if interpolation == UsdGeom.Tokens.faceVarying:
-                self._uvData[uvName] = self._getFaceVaryingUVs(primvar)
-            elif interpolation == UsdGeom.Tokens.vertex:
-                self._uvData[uvName] = self._getVertexVaryingUVs(primvar)
-            else:
-                logger.error("Invalid interpolation (%s) for uv data.", interpolation)
-                return [None, None]
-        return self._uvData[uvName]
+
+        primvar = self._mesh.GetPrimvar(uvName)
+        interpolation = primvar.GetInterpolation()
+        if interpolation == UsdGeom.Tokens.faceVarying:
+            return self._getFaceVaryingUVs(primvar)
+        elif interpolation == UsdGeom.Tokens.vertex:
+            return self._getVertexVaryingUVs(primvar)
+
+        logger.error("Invalid interpolation (%s) for uv data.", interpolation)
+        return [None, None]
 
     def _getFaceVaryingUVs(self, primvar):
         faceVertCountList = self._mesh.GetFaceVertexCountsAttr().Get()
         uvPositions = primvar.Get()
         uvIndices = primvar.GetIndices()
-        return [uvPositions, self._createUVEdges(faceVertCountList, [uvIndices])]
+        edgeIndices = self._createUVEdges(faceVertCountList, [uvIndices])
+        return [uvPositions, edgeIndices]
 
     def _getVertexVaryingUVs(self, primvar):
         faceVertCountList = self._mesh.GetFaceVertexCountsAttr().Get()
@@ -110,8 +117,8 @@ class MeshUVs:
         uvIndexMaps = [faceVertexIndices]
         if uvIndices:
             uvIndexMaps.append(uvIndices)
-        edges = self._createUVEdges(faceVertCountList, uvIndexMaps)
-        return [uvPositions, edges]
+        edgeIndices = self._createUVEdges(faceVertCountList, uvIndexMaps)
+        return [uvPositions, edgeIndices]
 
     @staticmethod
     def _createUVEdges(faceVertCountList, indexMaps):
@@ -124,11 +131,9 @@ class MeshUVs:
                 for indexMap in indexMaps:
                     firstIndex = indexMap[firstIndex]
                     secondIndex = indexMap[secondIndex]
-                edges.append(firstIndex)
-                edges.append(secondIndex)
+                edges.append((firstIndex, secondIndex))
             consumedIndices += faceVertCount
         return edges
-
 
 
 NUM_GRIDS_FROM_ORIGIN = 5

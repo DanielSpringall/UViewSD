@@ -1,4 +1,3 @@
-from uvviewerplugin import UVViewerPluginContainer
 from OpenGL.raw.GL.VERSION.GL_4_0 import GL_MAX_TESS_CONTROL_TOTAL_OUTPUT_COMPONENTS
 from PySide2 import QtWidgets, QtGui, QtCore
 from pxr import Usd, UsdGeom
@@ -128,7 +127,7 @@ class ViewerWidget(QtWidgets.QOpenGLWidget):
         projectionMatrix = self._camera.glProjectionMatrix()
         if self._showGrid:
             self._backgroundGrid.draw(projectionMatrix)
-        for shape in self._shapes:
+        for shape in self._shapes.values():
             shape.draw(projectionMatrix)
         self._painter.endNativePainting()
 
@@ -264,7 +263,7 @@ class Window(QtWidgets.QMainWindow):
             self._usdviewApi.dataModel.selection.signalPrimSelectionChanged.connect(self.selectionChanged)
         self._gridToggleButton.clicked.connect(self._view.toggleGridVisibility)
 
-    def addPrimPaths(self, primPaths, override=False):
+    def addPrimPaths(self, primPaths, replace=False):
         prims = []
         for primPath in primPaths:
             prim = self._stage.GetPrimAtPath(primPath)
@@ -272,38 +271,38 @@ class Window(QtWidgets.QMainWindow):
                 logger.error("No valid prim at path: %s", primPath)
                 continue
             prims.append(prim)
-        return self.addPrims(prims, override)
+        return self.addPrims(prims, replace=replace)
 
-    def addPrims(self, prims, override=False):
-        if override:
+    def addPrims(self, prims, replace=False):
+        if replace:
             self._view.clear()
 
-        shapes = []
+        shapes = {}
         for prim in prims:
             for mesh in self._meshes:
                 if prim == mesh.prim():
                     continue
 
             mesh = UsdGeom.Mesh(prim)
-            if not MeshUVs.validMesh(mesh):
+            if not shape.MeshUVs.validMesh(mesh):
                 continue
 
-            uvData = MeshUVs(mesh)
+            uvData = shape.MeshUVs(mesh)
             [positions, indices] = uvData.uvData("st")
             if positions is None or indices is None:
                 continue
 
             lines = []
-            for index in indices:
-                lines.extend(positions[index])
-            shapes.append(shape.UVShape(lines))
-            self._meshes.extend
+            for edgeIndices in indices:
+                for index in edgeIndices:
+                    lines.extend(positions[index])
+
+            shapes[prim.GetPath().pathString] = shape.UVShape(lines)
         self._view.addShapes(shapes)
 
     def updateView(self):
         if not self._meshes:
             return
-        
 
     def keyPressEvent(self, event):
         self._view.keyPressEvent(event)
@@ -326,8 +325,8 @@ def run(usdviewApi=None, primPath=None):
         parent = usdviewApi.qMainWindow
     else:
         # stage = Usd.Stage.Open("C:\\Libraries\\USD\\share\\usd\\Attic_NVIDIA\\Attic_NVIDIA.usd")
-        stage = None
         stage = Usd.Stage.Open("C:\\Libraries\\USD\\share\\usd\\kitchenSet\\Kitchen_set.usd")
+        # stage = Usd.Stage.Open("C:\\Users\\Daniel\\Projects\\Python\\UViewSD\\tests\\uvdata.usda")
         parent = None
 
     window = Window(parent=parent, stage=stage, usdviewApi=usdviewApi)
@@ -341,6 +340,7 @@ def run(usdviewApi=None, primPath=None):
     # KITCHEN STUFF
     if not usdviewApi:
         window.addPrimPaths(['/Kitchen_set/Props_grp/North_grp/NorthWall_grp/CastIron_1/Geom/pCylinder151'])
+        # window.addPrimPaths(['/root/faceVaryingUVs'])
 
     return window
 
