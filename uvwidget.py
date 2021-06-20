@@ -22,20 +22,16 @@ class ViewerWidget(QtWidgets.QOpenGLWidget):
 
     # SHAPE MANAGEMENT
     def addShapes(self, shapes):
-        """ Add a list of shapes to be drawn in the scene and refresh the view. 
-        
+        """ Add a list of shapes to be drawn in the scene and refresh the view.
+        Existing shapes with the same name will be overridden.
+
         Args:
             shapes (dict{name: shape.UVShape}):
                 Dictionary of the shapes to draw. Keys are the identifiers for each shape, values are the shape data.
         """
-        updated = False
         for shapeName in shapes:
-            if shapeName in self._shapes:
-                continue
-            updated = True
             self._shapes[shapeName] = shapes[shapeName]
-        if updated:
-            self.update()
+        self.update()
 
     def removeShapes(self, shapeNames):
         """ CLear a list of shapes from the view
@@ -46,14 +42,14 @@ class ViewerWidget(QtWidgets.QOpenGLWidget):
         if not self._shapes:
             return
 
-        itemRemoved = False
+        shapeRemoved = False
         for shapeName in shapeNames:
             if shapeName not in self._shapes:
                 continue
             del self._shapes[shapeName]
-            itemRemoved = True
+            shapeRemoved = True
 
-        if itemRemoved:
+        if shapeRemoved:
             self.update()
 
     def removeAllShapes(self):

@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 # USD
-class MeshUVs:
+class UVExtractor:
     def __init__(self, mesh):
         """ Helper class for extracting uv data from a USDGeom mesh. """
         self._mesh = mesh
@@ -163,7 +163,7 @@ class UVShape:
 
     def initializeGLData(self):
         """ Initialize the OpenGL data for drawing. Should only be called once. """
-        self._shader = shader.ShaderProgram(vertexShaderName="line", fragmentShaderName="line")
+        self._shader = shader.getLineShader()
         self._vao = GL.glGenVertexArrays(1)
         pbo = GL.glGenBuffers(1)
 
@@ -205,7 +205,7 @@ class Grid:
 
     def __init__(self):
         """ OpenGL class for drawin the all the lines that make up the background grid for the uv viewer. """
-        self._shader = shader.ShaderProgram(vertexShaderName="line", fragmentShaderName="line")
+        self._shader = shader.getLineShader()
 
         incrementalLines = []
         unitLines = []
