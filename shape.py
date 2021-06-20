@@ -145,6 +145,42 @@ class UVExtractor:
         return edges
 
 
+class BBox:
+    def __init__(self, pos0, pos1):
+        if pos0[0] <= pos1[0]:
+            self.xMin = pos0[0]
+            self.xMax = pos1[0]
+        else:
+            self.xMin = pos1[0]
+            self.xMax = pos0[0]
+        if pos0[1] <= pos1[1]:
+            self.yMin = pos0[1]
+            self.yMax = pos1[1]
+        else:
+            self.yMin = pos1[1]
+            self.yMax = pos0[1]
+
+    def updateWithPosition(self, xPos, yPos):
+        if self.xMin > xPos:
+            self.xMin = xPos
+        elif self.xMax < xPos:
+            self.xMax = xPos
+        if self.yMin > yPos:
+            self.yMin = yPos
+        elif self.yMax < yPos:
+            self.yMax = yPos
+
+    def updateWithBBox(self, otherBBox):
+        if self.xMin > otherBBox._xMin:
+            self.xMin = otherBBox._xMin
+        if self.xMax < otherBBox._xMax:
+            self.xMax = otherBBox._xMax
+        if self.yMin > otherBBox._yMin:
+            self.yMin = otherBBox._yMin
+        if self.yMax > otherBBox._yMax:
+            self.yMax = otherBBox._yMax
+
+
 # OPENGL
 class UVShape:
     def __init__(self, edges):
@@ -152,14 +188,37 @@ class UVShape:
         
         Args:
             edges (list[float]):
-                A list of uv positions. Every 2 items in the list corresponds to a start and end point of a line.
+                A list of uv positions. and the edges they make up.
+                [uvPos0.x, uvPos0.y, uvPos1.x, uvPose1.y] * number of edges.
+                Where uvPose0 and uvPos1 make up an edge.
         """
         self.bound = False
         self._vao = None
         self._color = (1.0, 1.0, 1.0)
         self._shader = None
-        self._edges = np.array(edges, dtype=np.float32)
-        self._numEdges = int(len(self._edges) / 2)
+        self._positions = np.array(edges, dtype=np.float32)
+        self._numUVs = int(len(self._positions) / 2)
+
+        self._bbox = None
+
+    def bbox(self):
+        """ Calculate the bounding box from the uv positions.
+        
+        Returns:
+            BBox: The bbox surounding the uv positions.
+        """
+        if self._bbox is None:
+            bbox = BBox(
+                [self._positions[0], self._positions[1]],
+                [self._positions[2], self._positions[3]],
+            )
+            for i in range(2, self._numUVs):
+                xPos = self._positions[i * 2]
+                yPos = self._positions[i * 2 + 1]
+                bbox.updateWithPosition(xPos, yPos)
+            self._bbox = bbox
+
+        return self._bbox
 
     def initializeGLData(self):
         """ Initialize the OpenGL data for drawing. Should only be called once. """
@@ -173,7 +232,7 @@ class UVShape:
         GL.glEnableVertexAttribArray(0)
         GL.glVertexAttribPointer(0, 2, GL.GL_FLOAT, GL.GL_FALSE, 0, c_void_p(0))
 
-        GL.glBufferData(GL.GL_ARRAY_BUFFER, self._edges.nbytes, self._edges, GL.GL_STATIC_DRAW)
+        GL.glBufferData(GL.GL_ARRAY_BUFFER, self._positions.nbytes, self._positions, GL.GL_STATIC_DRAW)
 
         GL.glBindBuffer(GL.GL_ARRAY_BUFFER, 0)
         GL.glBindVertexArray(0)
@@ -194,7 +253,7 @@ class UVShape:
         GL.glLineWidth(1.0)
         GL.glBindVertexArray(self._vao)
         self._shader.setVec3f("color", self._color)
-        GL.glDrawArrays(GL.GL_LINES, 0, self._numEdges)
+        GL.glDrawArrays(GL.GL_LINES, 0, self._numUVs)
         GL.glBindVertexArray(0)
 
 

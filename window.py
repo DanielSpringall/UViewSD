@@ -28,8 +28,9 @@ class UVViewerWindow(QtWidgets.QMainWindow):
 
         self._setupUI()
         self._setupConnections()
+        self.setFocus()
 
-        self.setGeometry(850, 400, 800, 800)
+        # self.setGeometry(850, 400, 800, 800)
 
     # UI
     def _setupUI(self):
@@ -249,29 +250,20 @@ class UVViewerWindow(QtWidgets.QMainWindow):
         self._uvNameComboBox.blockSignals(False)
 
 
-def run():
-    # stage = Usd.Stage.Open("C:\\Libraries\\USD\\share\\usd\\Attic_NVIDIA\\Attic_NVIDIA.usd")
-    stage = Usd.Stage.Open("C:\\Libraries\\USD\\share\\usd\\kitchenSet\\Kitchen_set.usd")
-    # stage = Usd.Stage.Open("C:\\Users\\Daniel\\Projects\\Python\\UViewSD\\tests\\uvdata.usda")
-    parent = None
-
-    window = UVViewerWindow(parent=parent, stage=stage)
-    window.show()
-
-    # ATTIC STUFF
-    # primPath = "/Root/Geometry/side_table_525/side_table"
-    # window.addPrimPaths([primPath])
-
-    # KITCHEN STUFF
-    window.addPrimPaths(['/Kitchen_set/Props_grp/North_grp/NorthWall_grp/CastIron_1/Geom/pCylinder151'])
-    # window.addPrimPaths(['/root/faceVaryingUVs'])
-
-    return window
-
-
 if __name__ == "__main__":
     logger.setLevel(logging.DEBUG)
     QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_UseDesktopOpenGL)
     app = QtWidgets.QApplication([])
-    window = run()
+
+    # ATTIC
+    # stage = Usd.Stage.Open("C:\\Libraries\\USD\\share\\usd\\Attic_NVIDIA\\Attic_NVIDIA.usd")
+    # primPaths = ["/Root/Geometry/side_table_525/side_table"]
+
+    # KITCHEN
+    stage = Usd.Stage.Open("C:\\Libraries\\USD\\share\\usd\\kitchenSet\\Kitchen_set.usd")
+    primPaths = ['/Kitchen_set/Props_grp/North_grp/NorthWall_grp/CastIron_1/Geom/pCylinder151']
+
+    window = UVViewerWindow(stage)
+    window.addPrimPaths(primPaths)
+    window.show()
     app.exec_()

@@ -117,10 +117,9 @@ class Camera2D:
             coord (list[float, float]): World space co-ordinate to zoom on.
             amount (float): Value to multiply the current scale by. Value of 1.0 is the same as no scale.
         """
-        self.setProjectionMatrix(self.scaleMatrixAroundPoint(self.projectionMatrix(), amount, coord))
+        self.setProjectionMatrix(self.scaleMatrixAroundPoint(self._projMat, amount, coord))
 
-    @classmethod
-    def scaleMatrixAroundPoint(cls, matrixToScale, scaleAmount, coord, minScaleAmount=0.01):
+    def scaleMatrixAroundPoint(self, matrixToScale, scaleAmount, coord, minScaleAmount=0.01):
         """ Utility method to uniformly scale a matrix around a given co-ordinate.
 
         Args:
@@ -140,8 +139,8 @@ class Camera2D:
         if coord[0] == 0.0 and coord[1] == 0.0:
             matrixToScale[0][0] = resultingScaleAmount
             matrixToScale[1][1] = resultingScaleAmount
-        else:    
-            translationMatrix = cls.createTransformationMatrix(coord[0], coord[1])
+        else:
+            translationMatrix = self.createTransformationMatrix(coord[0], coord[1] * self._aspectRatio)
             matrixToScale = matrixToScale.dot(translationMatrix)
             matrixToScale[0][0] = resultingScaleAmount
             matrixToScale[1][1] = resultingScaleAmount
@@ -168,11 +167,9 @@ class Camera2D:
             matrix (np.matrix(4x4)): The projection matrix to set.
         """
         self._projMat = matrix
-
-        aspectRatioMatrix = matrix.copy()
-        aspectRatioMatrix[1][1] *= self._aspectRatio
-        aspectRatioMatrix[3][1] *= self._aspectRatio
-        self._projMat_aspectRatio = aspectRatioMatrix
+        self._projMat_aspectRatio = matrix.copy()
+        self._projMat_aspectRatio[1][1] *= self._aspectRatio
+        self._projMat_aspectRatio[3][1] *= self._aspectRatio
         self._invProj_aspectRatio = np.linalg.inv(self._projMat_aspectRatio)
 
     def projectionMatrix(self):

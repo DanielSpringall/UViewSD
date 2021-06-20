@@ -52,7 +52,7 @@ class ViewerWidget(QtWidgets.QOpenGLWidget):
         if shapeRemoved:
             self.update()
 
-    def removeAllShapes(self):
+    def clear(self):
         """ Clear all the current shapes drawn in the view. """
         if not self._shapes:
             return
@@ -61,27 +61,10 @@ class ViewerWidget(QtWidgets.QOpenGLWidget):
 
     # QT EVENTS
     def keyPressEvent(self, event):
-        if event.key() == QtCore.Qt.Key_F:
-            self._camera.focus(0, 1, 1, 0)
-            self.update()
-        if event.key() == QtCore.Qt.Key_1:
-            self._camera.zoom([0.5, 0.5], 0.9)
-            self.update()
-        if event.key() == QtCore.Qt.Key_2:
-            self._camera.zoom([0.5, 0.5], 1.1)
-            self.update()
-        if event.key() == QtCore.Qt.Key_Left:
-            self._camera.pan(-0.5, 0.0)
-            self.update()
-        if event.key() == QtCore.Qt.Key_Right:
-            self._camera.pan(0.5, 0.0)
-            self.update()
-        if event.key() == QtCore.Qt.Key_Down:
-            self._camera.pan(0.0, -0.5)
-            self.update()
-        if event.key() == QtCore.Qt.Key_Up:
-            self._camera.pan(0.0, 0.5)
-            self.update()
+        # TODO: Fix aspect ratio of window breaking focus.
+        # if event.key() == QtCore.Qt.Key_F:
+            # self.focusOnBBox()
+        pass
 
     def mousePressEvent(self, event):
         if not self._activeState:
@@ -103,10 +86,20 @@ class ViewerWidget(QtWidgets.QOpenGLWidget):
 
         pos = event.pos()
         screenCoords = [pos.x() / self.width(), pos.y() / self.height()]
-        worldCoords = self._camera.mapScreenToWorld(screenCoords)
+        glCoords = self._camera.mapScreenToGl(screenCoords)
+        worldCoords = self._camera.mapGlToWorld(glCoords)
         delta = event.angleDelta().y()
         zoomAmount = 1 + (delta and delta // abs(delta)) * 0.03
         self._camera.zoom(worldCoords, zoomAmount)
+        self.update()
+
+    def focusOnBBox(self):
+        """ Focus the viewer on the bbox sorounding all the currently displayed shapes. """
+        shapes = list(self._shapes.values())
+        bbox = shapes[0].bbox()
+        for _shape in shapes[1:]:
+            bbox.updateWithBBox(_shape.bbox())
+        self._camera.focus(bbox.xMin, bbox.xMax, bbox.yMax, bbox.yMin)
         self.update()
 
     # GL EVENTS
