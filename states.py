@@ -12,7 +12,7 @@ def stateFromEvent(event):
     """
     modifiers = QtWidgets.QApplication.keyboardModifiers()
     button = event.button()
-    for state in [PanState, ZoomState]:
+    for state in AVAILABLE_STATES:
         if state.canEnable(modifiers, button):
             return state
     return None
@@ -115,3 +115,6 @@ class PanState(BaseState):
         )
         self._camera.setProjectionMatrix(np.matmul(self._initProjMat, transformMatrix))
         return True
+
+
+AVAILABLE_STATES = [PanState, ZoomState]

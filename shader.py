@@ -76,23 +76,8 @@ class ShaderProgram:
             shaderString = inFile.read()
         return shaderString
 
-    def setBool(self, name, value):
-        GL.glUniform1i(GL.glGetUniformLocation(self.programId, name), int(bool(value)));
-
-    def setInt(self, name, value):
-        GL.glUniform1i(GL.glGetUniformLocation(self.programId, name), int(value))
-
-    def setFloat(self, name, value):
-        GL.glUniform1f(GL.glGetUniformLocation(self.programId, name), float(value))
-
-    def setVec2f(self, name, value):
-        GL.glUniform2fv(GL.glGetUniformLocation(self.programId, name), value)
-
     def setVec3f(self, name, value):
         GL.glUniform3fv(GL.glGetUniformLocation(self.programId, name), 1, value)
-
-    def setVec4f(self, name, value):
-        GL.glUniform4fv(GL.glGetUniformLocation(self.programId, name), 1, value)
 
     def setMatrix4f(self, name, value):
         GL.glUniformMatrix4fv(GL.glGetUniformLocation(self.programId, name), 1, GL.GL_FALSE, value)

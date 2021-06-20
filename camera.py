@@ -24,7 +24,8 @@ class Camera2D:
 
     def focus(self, left, right, top, bottom):
         """ Focus the projection matrix to a given square denoted by left/right/top/bottom units.
-        Will take the image width/height into account to ensure the focus region fits inside it.
+        All units are interpreted as world unites. Will take the image width/height into
+        account to ensure the focus region fits inside it.
 
         Args:
             left (float): The left unit in world space of the focus region.
@@ -175,7 +176,7 @@ class Camera2D:
         self._invProj_aspectRatio = np.linalg.inv(self._projMat_aspectRatio)
 
     def projectionMatrix(self):
-        """ The current projectino matrix.
+        """ The current projection matrix.
 
         Return:
             (np.matrix(4x4)): The current projection matrix.
@@ -183,7 +184,7 @@ class Camera2D:
         return self._projMat_aspectRatio
 
     def glProjectionMatrix(self):
-        """ Utility method to get the projectino matrix in a way that can be used by GL.
+        """ Utility method to get the projection matrix in a way that can be used by GL.
 
         Return:
             (float[16]): Flattened projection matrix.
