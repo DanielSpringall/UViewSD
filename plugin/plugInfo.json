@@ -2,10 +2,10 @@
     "Plugins": [
         {
             "Type": "python",
-            "Name": "uvviewerplugin",
+            "Name": "plugin.uvviewerplugin",
             "Info": {
                 "Types": {
-                    "uvviewerplugin.UVViewerPluginContainer": {
+                    "plugin.uvviewerplugin.UVViewerPluginContainer": {
                         "bases": ["pxr.Usdviewq.plugin.PluginContainer"],
                         "displayName": "UV Viewer"
                     }
