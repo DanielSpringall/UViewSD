@@ -61,10 +61,8 @@ class ViewerWidget(QtWidgets.QOpenGLWidget):
 
     # QT EVENTS
     def keyPressEvent(self, event):
-        # TODO: Fix aspect ratio of window breaking focus.
-        # if event.key() == QtCore.Qt.Key_F:
-            # self.focusOnBBox()
-        pass
+        if event.key() == QtCore.Qt.Key_F:
+            self.focusOnBBox()
 
     def mousePressEvent(self, event):
         if not self._activeState:
@@ -85,8 +83,7 @@ class ViewerWidget(QtWidgets.QOpenGLWidget):
             return
 
         pos = event.pos()
-        screenCoords = [pos.x() / self.width(), pos.y() / self.height()]
-        glCoords = self._camera.mapScreenToGl(screenCoords)
+        glCoords = self._camera.mapScreenToGl([pos.x(), pos.y()])
         worldCoords = self._camera.mapGlToWorld(glCoords)
         delta = event.angleDelta().y()
         zoomAmount = 1 + (delta and delta // abs(delta)) * 0.03
@@ -94,12 +91,18 @@ class ViewerWidget(QtWidgets.QOpenGLWidget):
         self.update()
 
     def focusOnBBox(self):
-        """ Focus the viewer on the bbox sorounding all the currently displayed shapes. """
+        """ Focus the viewer on the bbox surounding all the currently displayed shapes. """
         shapes = list(self._shapes.values())
-        bbox = shapes[0].bbox()
-        for _shape in shapes[1:]:
-            bbox.updateWithBBox(_shape.bbox())
-        self._camera.focus(bbox.xMin, bbox.xMax, bbox.yMax, bbox.yMin)
+        if not shapes:
+            self._camera.focus(0, 1, 1, 0)
+        else:
+            bbox = None
+            for _shape in shapes:
+                if bbox is None:
+                    bbox = _shape.bbox()
+                else:
+                    bbox.updateWithBBox(_shape.bbox())
+            self._camera.focus(bbox.xMin, bbox.xMax, bbox.yMax, bbox.yMin)
         self.update()
 
     # GL EVENTS
@@ -141,12 +144,7 @@ class ViewerWidget(QtWidgets.QOpenGLWidget):
     def drawText(self, painter):
         """ Paint the grid values in the scene. """
         originCoord = self._camera.mapWorldToScreen([0.0, 0.0])
-        originCoord[0] = originCoord[0] * self.width()
-        originCoord[1] = originCoord[1] * self.height()
-
         offsetCoord = self._camera.mapWorldToScreen([0.1, 0.1])
-        offsetCoord[0] = offsetCoord[0] * self.width()
-        offsetCoord[1] = offsetCoord[1] * self.height()
 
         width = offsetCoord[0] - originCoord[0]
         height = originCoord[1] - offsetCoord[1]

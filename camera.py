@@ -9,20 +9,20 @@ class Camera2D:
             width (int): Screen width.
             height (int): Screen height.
         """
-        self._aspectRatio = width / height
+        self._screenWidth = width
+        self._screenHeight = height
+        self._screenAspectRatio = width / height
+        # Cached focus region used to prevent jittering when consecutively calling resize. e.g. during user window resize.
+        self._initResizeFocusRegion = None
 
         # Cached projection matrix and matrices used for internal calculations
         self._projMat = None
-        self._projMat_aspectRatio = None
-        self._invProj_aspectRatio = None
-
-        # Percentage of the Vertical/horizontal width to apply as a buffer when focusing
-        self._focusBuffer = 0.1
+        self._invProjMat = None
 
         # Initial camera focus
         self.focus(0, 1, 1, 0)
 
-    def focus(self, left, right, top, bottom):
+    def focus(self, left, right, top, bottom, bufferScale=0.1, clearFocusCache=True):
         """ Focus the projection matrix to a given square denoted by left/right/top/bottom units.
         All units are interpreted as world unites. Will take the image width/height into
         account to ensure the focus region fits inside it.
@@ -32,15 +32,55 @@ class Camera2D:
             right (float): The right unit in world space of the focus region.
             top (float): The top unit in world space of the focus region.
             bottom (float): The bottom unit in world space of the focus region.
+            bufferScale (float): Value multiplied by width/height to add as horizontal/vertical buffer to the focus region. 0.1 = 10%.
+            clearFocusCache (bool): If True, clear the cached focus region used during resize.
         """
-        xBuffer = (right - left) * self._focusBuffer
-        yBuffer = (top - bottom) * self._focusBuffer
-        left -= xBuffer
-        right += xBuffer
-        top += yBuffer
-        bottom -= yBuffer
+        width = right - left
+        height = top - bottom
+        aspectRatio = width / height 
+
+        if self._screenAspectRatio >= aspectRatio:
+            halfWidth = width / 2.0
+            xMid = left + halfWidth
+            scaledHalfWidth = abs(self._screenAspectRatio / aspectRatio * halfWidth)
+            left = xMid - scaledHalfWidth
+            right = xMid + scaledHalfWidth
+        else:
+            halfHeight = height / 2.0
+            yMid = bottom + halfHeight
+            scaledHalfHeight = abs(aspectRatio / self._screenAspectRatio * halfHeight)
+            top = yMid + scaledHalfHeight
+            bottom = yMid - scaledHalfHeight
+
+        if bufferScale:
+            xBuffer = (right - left) * bufferScale
+            yBuffer = (top - bottom) * bufferScale
+            left -= xBuffer
+            right += xBuffer
+            top += yBuffer
+            bottom -= yBuffer
+
         projMat = self.createProjectionMatrix(left, right, top, bottom)
-        self.setProjectionMatrix(projMat)
+        self.setProjectionMatrix(projMat, clearFocusCache)
+
+    def getFocusRegion(self):
+        """ Extract the focus region from the cameras projection matrix.
+
+        Returns:
+            list[float, float, float, float]: Left, right, top, bottom values of the focus region.
+        """
+        projectionMat = self.projectionMatrix()
+        xScale = projectionMat[0][0]
+        yScale = projectionMat[1][1]
+        xTransform = projectionMat[0][3]
+        yTransform = projectionMat[1][3]
+
+        left = -(1 + xTransform) / xScale
+        right = (1 - xTransform) / xScale
+        top = (1 - yTransform) / yScale
+        bottom = -(1 + yTransform) / yScale
+        
+        return [left, right, top, bottom]
 
     def pan(self, x=0, y=0):
         """ Pan the projection matrix.
@@ -55,27 +95,31 @@ class Camera2D:
         transformationMatrix = self.createTransformationMatrix(x, y)
         self.setProjectionMatrix(np.matmul(self._projMat, transformationMatrix))
 
-    @staticmethod
-    def mapGlToScreen(coord):
-        """ Map a GL screen co-ordinate to its corresponding Qt screen co-ordinate.
+    def mapGlToScreen(self, coord):
+        """ Map a GL screen co-ordinate to its corresponding Qt screen co-ordinate for the current screen.
 
         Args:
             coord (list[float, float]): The GL screen co-ordinate to map from.
-        Return:
-            (list[float, float]): The Qt mapped screen co-ordinate.
+        Returns:
+            list[float, float]: The Qt mapped screen co-ordinate.
         """
-        return [coord[0] / 2 + 0.5, coord[1] / -2 + 0.5]
+        return [
+            (coord[0] / 2 + 0.5) * self._screenWidth,
+            (coord[1] / -2 + 0.5) * self._screenHeight
+        ]
 
-    @staticmethod
-    def mapScreenToGl(coord):
-        """ Map a Qt screen co-ordinate to its corresponding GL screen co-ordinate.
+    def mapScreenToGl(self, coord):
+        """ Map a Qt screen co-ordinate to its corresponding GL screen co-ordinate for the current screen.
 
         Args:
             coord (list[float, float]): The Qt screen co-ordinate to map from.
-        Return:
-            (list[float, float]): The GL mapped screen co-ordinate.
+        Returns:
+            list[float, float]: The GL mapped screen co-ordinate.
         """
-        return [(coord[0] - 0.5) * 2, (coord[1] - 0.5) * -2]
+        return [
+            coord[0] / self._screenWidth * 2 - 1,
+            (coord[1] / self._screenHeight - 0.5) * -2
+        ]
 
     def mapScreenToWorld(self, coord):
         """ Map a QT screen co-ordinate to its corresponding world co-ordinate.
@@ -92,22 +136,22 @@ class Camera2D:
 
         Args:
             coord (list[float, float]): The GL screen co-ordinate to map from.
-        Return:
-            (list[float, float]): The mapped world co-ordinate.
+        Returns:
+            list[float, float]: The mapped world co-ordinate.
         """
         glScreenPosition = np.array([coord[0], coord[1], 0.0, 1.0])
-        return self._invProj_aspectRatio.dot(glScreenPosition)[:2]
+        return self._invProjMat.dot(glScreenPosition)[:2]
 
     def mapWorldToScreen(self, coord):
         """ Map a world co-ordinate to its corresponding QT screen co-ordinate.
 
         Args:
             coord (list[float, float]): The world co-ordinate to map from.
-        Return:
-            (list[float, float]): The mapped Qt screen co-ordinate.
+        Returns:
+            list[float, float]: The mapped Qt screen co-ordinate.
         """
         worldCoord = np.array([coord[0], coord[1], 0.0, 1.0])
-        screenGlCoord = self._projMat_aspectRatio.dot(worldCoord)[:2]
+        screenGlCoord = self._projMat.dot(worldCoord)[:2]
         return self.mapGlToScreen(screenGlCoord)
 
     def zoom(self, coord, amount):
@@ -117,36 +161,7 @@ class Camera2D:
             coord (list[float, float]): World space co-ordinate to zoom on.
             amount (float): Value to multiply the current scale by. Value of 1.0 is the same as no scale.
         """
-        self.setProjectionMatrix(self.scaleMatrixAroundPoint(self._projMat, amount, coord))
-
-    def scaleMatrixAroundPoint(self, matrixToScale, scaleAmount, coord, minScaleAmount=0.01):
-        """ Utility method to uniformly scale a matrix around a given co-ordinate.
-
-        Args:
-            matrixToScale (np.matrix(4x4)): The matrix to scale.
-            scaleAmount (float): The amount to multiply the current matrices scale by.
-            coord (list[float, float]): The co-ordinate to scale the matrix around.
-            minScaleAmount (float): The minimum scale allowed to help prevent flipping.
-        """
-        currentScaleAmount = matrixToScale[0][0]
-        if scaleAmount == 1.0 or currentScaleAmount <= minScaleAmount:
-            return matrixToScale
-
-        resultingScaleAmount = currentScaleAmount * scaleAmount
-        if resultingScaleAmount <= minScaleAmount:
-            resultingScaleAmount = minScaleAmount
-
-        if coord[0] == 0.0 and coord[1] == 0.0:
-            matrixToScale[0][0] = resultingScaleAmount
-            matrixToScale[1][1] = resultingScaleAmount
-        else:
-            translationMatrix = self.createTransformationMatrix(coord[0], coord[1] * self._aspectRatio)
-            matrixToScale = matrixToScale.dot(translationMatrix)
-            matrixToScale[0][0] = resultingScaleAmount
-            matrixToScale[1][1] = resultingScaleAmount
-            matrixToScale = matrixToScale.dot(np.linalg.inv(translationMatrix))
-
-        return matrixToScale
+        self.setProjectionMatrix(self.scaleMatrixAroundPoint(self._projMat, amount, amount, coord))
 
     def resize(self, width, height):
         """ Resize the camera output image.
@@ -155,38 +170,89 @@ class Camera2D:
             width (int): New screen width.
             height (int): New screen height.
         """
-        newAspectRatio = float(width) / float(height)
-        if newAspectRatio != self._aspectRatio:
-            self._aspectRatio = newAspectRatio
-            self.setProjectionMatrix(self._projMat)
+        if self._initResizeFocusRegion is None:
+            self._initResizeFocusRegion = self.getFocusRegion()
+        [left, right, top, bottom] = self._initResizeFocusRegion
 
-    def setProjectionMatrix(self, matrix):
+        self._screenWidth = width
+        self._screenHeight = height
+        self._screenAspectRatio = width / height
+
+        halfHeight = (top - bottom) / 2.0
+        yMid = bottom + halfHeight
+        scaledHalfHeight = halfHeight / self._screenAspectRatio
+        bottom = yMid - scaledHalfHeight
+        top = yMid + scaledHalfHeight
+
+        self.focus(left, right, top, bottom, bufferScale=0.0, clearFocusCache=False)
+
+    def setProjectionMatrix(self, matrix, clearFocusCache=True):
         """ Set the projection matrix for the camera.
 
         Args:
             matrix (np.matrix(4x4)): The projection matrix to set.
+            clearFocusCache (bool): If True, clear the cached focus region used during resize.
         """
         self._projMat = matrix
-        self._projMat_aspectRatio = matrix.copy()
-        self._projMat_aspectRatio[1][1] *= self._aspectRatio
-        self._projMat_aspectRatio[3][1] *= self._aspectRatio
-        self._invProj_aspectRatio = np.linalg.inv(self._projMat_aspectRatio)
+        self._invProjMat = np.linalg.inv(self._projMat)
+        if clearFocusCache:
+            self._initResizeFocusRegion = None
 
     def projectionMatrix(self):
         """ The current projection matrix.
 
         Return:
-            (np.matrix(4x4)): The current projection matrix.
+            np.matrix(4x4): The current projection matrix.
         """
-        return self._projMat_aspectRatio
+        return self._projMat
 
     def glProjectionMatrix(self):
         """ Utility method to get the projection matrix in a way that can be used by GL.
 
         Return:
-            (float[16]): Flattened projection matrix.
+            float[16]: Flattened projection matrix.
         """
         return np.matrix.flatten(np.matrix.transpose(self.projectionMatrix()))
+
+    def scaleMatrixAroundPoint(self, matrix, xScale, yScale, coord, minScaleAmount=0.01):
+        """ Scale a matrix around a given co-ordinate taking the current screen aspect ratio into account.
+
+        Args:
+            matrix (np.matrix(4x4)): The matrix to scale.
+            xScale (float): The scale amount for the x axis.
+            yScale (float): The scale amount for the y axis.
+            coord (list[float, float]): The co-ordinate to scale the matrix around.
+            minScaleAmount (float): The minimum scale allowed to help prevent flipping.
+        """
+        currentXScale = matrix[0][0]
+        currentYScale = matrix[1][1]
+        if (
+            (xScale == 1.0 and yScale == 1.0) or
+            currentXScale <= minScaleAmount or
+            currentYScale <= minScaleAmount
+        ):
+            return matrix
+
+        resultingXScale = currentXScale * xScale
+        resultingYScale = currentYScale * yScale
+        if (
+            resultingXScale <= minScaleAmount or
+            resultingYScale <= minScaleAmount
+        ):
+            resultingXScale = minScaleAmount
+            resultingYScale = minScaleAmount * self._screenAspectRatio
+
+        if coord[0] == 0.0 and coord[1] == 0.0:
+            matrix[0][0] = resultingXScale
+            matrix[1][1] = resultingYScale
+        else:
+            translationMatrix = self.createTransformationMatrix(coord[0], coord[1])
+            matrix = matrix.dot(translationMatrix)
+            matrix[0][0] = resultingXScale
+            matrix[1][1] = resultingYScale
+            matrix = matrix.dot(np.linalg.inv(translationMatrix))
+
+        return matrix
 
     @staticmethod
     def createProjectionMatrix(left, right, top, bottom):
@@ -220,23 +286,9 @@ class Camera2D:
             x (float): The transformation value on the x axis.
             y (float): The transformation value on the y axis.
         Return:
-            (np.matrix(4x4)): Transformation matrix.
+            np.matrix(4x4): Transformation matrix.
         """
         matrix = np.identity(4)
         matrix[0][3] = x
         matrix[1][3] = y
-        return matrix
-
-    @staticmethod
-    def createScaleMatrix(scale):
-        """ Utility method to generate a uniformly scaled 2D 4x4 matrix.
-
-        Args:
-            scale (float): The scale amount for the x and y axis.
-        Return:
-            (np.matrix(4x4)): Scale matrix.
-        """
-        matrix = np.identity(4)
-        matrix[0][0] = scale
-        matrix[1][1] = scale
         return matrix

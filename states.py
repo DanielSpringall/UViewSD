@@ -21,12 +21,12 @@ def stateFromEvent(event):
 class BaseState:
     def __init__(self, event, camera, width, height):
         self._camera = camera
-        self._initProjMat = self._camera._projMat
-        self._width = width
-        self._height = height
+
+        self._initProjMat = self._camera.projectionMatrix()
         self._initGlScreenCoord = self._glScreenCoord(event)
         self._initWorldCoord = self._camera.mapGlToWorld(self._initGlScreenCoord)
-        self._scale = self._initProjMat[0][0]
+        self._initXScale = self._initProjMat[0][0]
+        self._initYScale = self._initProjMat[1][1]
 
     def _glScreenCoord(self, event):
         """ Get the GL screen co-ordinates from a Qt event.
@@ -34,11 +34,10 @@ class BaseState:
         Args:
             event (QtCore.QEvent): The event to get the co-ordinates from.
         Return:
-            (list[float, float]): The GL screen co-ordinates.
+            list[float, float]: The GL screen co-ordinates.
         """
         position = event.pos()
-        screenCoords = [position.x() / self._width, position.y() / self._height]
-        return self._camera.mapScreenToGl(screenCoords)
+        return self._camera.mapScreenToGl([position.x(), position.y()])
 
     @staticmethod
     def canEnable(modifiers, button):
@@ -48,7 +47,7 @@ class BaseState:
             modifiers (Qt.KeyboardModifiers): The list of keyboard modifiers to test.
             button (Qt.MouseButton): The buttont to test.
         Return
-            (bool): True if modifiers/button match the enable state requiorements. False otherwise.
+            bool: True if modifiers/button match the enable state requiorements. False otherwise.
         """
         return False
 
@@ -60,7 +59,7 @@ class BaseState:
             modifiers (Qt.KeyboardModifiers): The list of keyboard modifiers to test.
             button (Qt.MouseButton): The buttont to test.
         Return
-            (bool): True if modifiers/button match the disable state requiorements. False otherwise.
+            bool: True if modifiers/button match the disable state requiorements. False otherwise.
         """
         return True
 
@@ -70,7 +69,7 @@ class BaseState:
         Args:
             event (QtCore.QEvent): The event to update from.
         Return:
-            (bool): True if an update occured. False otherwise..
+            bool: True if an update occured. False otherwise.
         """
         return False
 
@@ -90,8 +89,13 @@ class ZoomState(BaseState):
         screenCoord = self._glScreenCoord(event)
         xZoom = screenCoord[0] - self._initGlScreenCoord[0]
         yZoom = self._initGlScreenCoord[1] - screenCoord[1]
-        zoomAmount = max(0.01, 1 + (xZoom + yZoom) / 2)
-        zoomedProjectionMatrix = self._camera.scaleMatrixAroundPoint(self._initProjMat, zoomAmount, self._initWorldCoord)
+        zoomAmount = max(0.01, 1 + (xZoom + yZoom) / 2.0)
+        zoomedProjectionMatrix = self._camera.scaleMatrixAroundPoint(
+            matrix=self._initProjMat,
+            xScale=zoomAmount,
+            yScale=zoomAmount,
+            coord=self._initWorldCoord
+        )
         self._camera.setProjectionMatrix(zoomedProjectionMatrix)
         return True
 
@@ -110,11 +114,18 @@ class PanState(BaseState):
     def update(self, event):
         screenCoord = self._glScreenCoord(event)
         transformMatrix = self._camera.createTransformationMatrix(
-            (screenCoord[0] - self._initGlScreenCoord[0]) / self._scale,
-            (screenCoord[1] - self._initGlScreenCoord[1]) / self._scale
+            (screenCoord[0] - self._initGlScreenCoord[0]) / self._initXScale,
+            (screenCoord[1] - self._initGlScreenCoord[1]) / self._initYScale,
         )
         self._camera.setProjectionMatrix(np.matmul(self._initProjMat, transformMatrix))
         return True
+
+
+class ResizeState:
+    """ Custom state to handle the resize event of the UI. """
+
+    def __init__(self):
+        pass
 
 
 AVAILABLE_STATES = [PanState, ZoomState]
