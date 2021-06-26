@@ -12,25 +12,25 @@ class UVViewerWindow(QtWidgets.QMainWindow):
     def __init__(self, stage=None, parent=None):
         QtWidgets.QMainWindow.__init__(self, parent=parent)
 
+        # Scene management
+        self._stage = stage
+        self._extractors = []
+        self._availableUVSetNames = []
+
         # UI objects
         self._view = None
         self._gridToggleButton = None
         self._loadTextureButton = None
         self._toggleTextureButton = None
         self._textureOptionComboBox = None
-        self._uvNameComboBox = None
+        self._uvSetNameComboBox = None
         self._uvNameLockCheckBox = None
 
-        # Scene management
-        self._stage = stage
-        self._extractors = []
-        self._availableUVNames = []
-
+        self.setWindowTitle("UViewSD")
         self._setupUI()
         self._setupConnections()
-        self.setFocus()
 
-        self.setGeometry(850, 400, 800, 800)
+        self.setFocus()
 
     # UI
     def _setupUI(self):
@@ -39,7 +39,7 @@ class UVViewerWindow(QtWidgets.QMainWindow):
         layout.setContentsMargins(3, 3, 3, 3)
         layout.setSpacing(3)
 
-        self._view = uvwidget.ViewerWidget()
+        self._view = uvwidget.UVViewerWidget()
 
         layout.addLayout(self._setupControlLayout())
         layout.addWidget(self._view)
@@ -53,10 +53,11 @@ class UVViewerWindow(QtWidgets.QMainWindow):
         layout.setSpacing(3)
 
         uvOptionsLabel = QtWidgets.QLabel()
-        uvOptionsLabel.setText("UV:")
-        uvOptionsLabel.setFixedWidth(20)
-        self._uvNameComboBox = QtWidgets.QComboBox()
-        self._uvNameComboBox.setMinimumWidth(50)
+        uvOptionsLabel.setText("UV Set:")
+        uvOptionsLabel.setFixedWidth(35)
+        self._uvSetNameComboBox = QtWidgets.QComboBox()
+        self._uvSetNameComboBox.setToolTip("UV set name extracted from the selected USD prims.")
+        self._uvSetNameComboBox.setMinimumWidth(200)
 
         spacerLine = QtWidgets.QFrame()
         spacerLine.setFrameShape(QtWidgets.QFrame.VLine)
@@ -65,9 +66,10 @@ class UVViewerWindow(QtWidgets.QMainWindow):
         self._gridToggleButton = QtWidgets.QPushButton()
         self._gridToggleButton.setIcon(self.style().standardIcon(getattr(QtWidgets.QStyle, "SP_DialogSaveButton")))
         self._gridToggleButton.setFixedWidth(25)
+        self._gridToggleButton.setToolTip("Enable/disable visibility of the grid lines and numbers from the view.")
 
         layout.addWidget(uvOptionsLabel)
-        layout.addWidget(self._uvNameComboBox)
+        layout.addWidget(self._uvSetNameComboBox)
         layout.addSpacing(3)
         layout.addWidget(spacerLine)
         layout.addSpacing(3)
@@ -76,49 +78,44 @@ class UVViewerWindow(QtWidgets.QMainWindow):
 
     def _setupConnections(self):
         self._gridToggleButton.clicked.connect(self._view.toggleGridVisibility)
-        self._uvNameComboBox.currentIndexChanged.connect(self.refreshUVViewer)
+        self._uvSetNameComboBox.currentIndexChanged.connect(self.refreshUVViewer)
 
     def keyPressEvent(self, event):
+        # Ensure we pass events through to the main widget.
         self._view.keyPressEvent(event)
-        if event.key() == QtCore.Qt.Key_0:
-            self.setGeometry(850, 400, 400, 800)
-        if event.key() == QtCore.Qt.Key_1:
-            self.setGeometry(850, 400, 800, 800)
-        if event.key() == QtCore.Qt.Key_2:
-            self.setGeometry(850, 400, 1600, 800)
-        if event.key() == QtCore.Qt.Key_3:
-            self.setGeometry(850, 400, 800, 400)
+        if not event.isAccepted():
+            QtWidgets.QMainWindow.keyPressEvent(self, event)
 
     # UV NAME
     @staticmethod
-    def defaultUVNameOrder():
+    def defaultUVSetNameOrder():
         """ Return a list of possible prim names to search for uv's with. """
         return ["uv", "st"]
 
-    def setUVName(self, uvName):
+    def setUVSetName(self, name):
         """
-        Programatically set the uvName to be used by the viewer. This will update the uvName in the UI, 
-        as well as refresh the shapes in the viewer to use the new uv name.
-        The uv name must exist in the list of avaiable uv names for a change to occur.
+        Programatically set the uv set name to be used by the viewer. This will update the name in the UI, 
+        as well as refresh the shapes in the viewer to use the new uv set name.
+        The name must exist in the list of avaiable uv set names for a change to occur.
 
         Args:
-            uvName (str): The name of the UV to set the viewer to.
+            name (str): The name of the UV set to change the viewer to.
         """
-        if uvName not in self._availableUVNames:
-            logger.error("%s is not an available uv name to set.", uvName)
+        if name not in self._availableUVSetNames:
+            logger.error("%s is not an available uv name to set.", name)
             return
 
-        currentIndex = self._uvNameComboBox.currentIndex()
-        requiredIndex = self._availableUVNames.index(uvName)
+        currentIndex = self._uvSetNameComboBox.currentIndex()
+        requiredIndex = self._availableUVSetNames.index(name)
         if currentIndex == requiredIndex:
-            logger.debug("UV name already set to %s.", uvName)
+            logger.debug("UV name already set to %s.", name)
             return
 
-        self._uvNameComboBox.setCurrentIndex(requiredIndex)
+        self._uvSetNameComboBox.setCurrentIndex(requiredIndex)
 
-    def uvName(self):
-        """ The current uvName selected in the UI by the user. """
-        return self._uvNameComboBox.currentText()
+    def uvSetName(self):
+        """ The current uv set name selected in the UI by the user. """
+        return self._uvSetNameComboBox.currentText()
 
     # VIEWER MANAGEMENT
     def addPrimPaths(self, primPaths, replace=False):
@@ -149,7 +146,7 @@ class UVViewerWindow(QtWidgets.QMainWindow):
             replace (bool): If True, will clear the current uv's from the view before adding anything new.
         """
         if replace:
-            self._availableUVNames = []
+            self._availableUVSetNames = []
             self._view.clear()
 
         # Get the valid extractors to use
@@ -170,9 +167,9 @@ class UVViewerWindow(QtWidgets.QMainWindow):
                     continue
                 extractor = shape.UVExtractor(mesh)
                 for uvName in extractor.validUVNames():
-                    if uvName not in self._availableUVNames:
+                    if uvName not in self._availableUVSetNames:
                         newUVNames = True
-                        self._availableUVNames.append(uvName)
+                        self._availableUVSetNames.append(uvName)
                 self._extractors.append(extractor)
             extractors.append(extractor)
         if not extractors:
@@ -180,25 +177,25 @@ class UVViewerWindow(QtWidgets.QMainWindow):
 
         # Update the uv name list
         if newUVNames:
-            self._availableUVNames.sort()
-            currentUVName = self.uvName()
+            self._availableUVSetNames.sort()
+            currentUVName = self.uvSetName()
             if not currentUVName:
                 # Fall back on the first default uv name that exists
-                for uvName in self.defaultUVNameOrder():
-                    if uvName in self._availableUVNames:
+                for uvName in self.defaultUVSetNameOrder():
+                    if uvName in self._availableUVSetNames:
                         currentUVName = uvName
                         break
-                # No default uv name exists. Finally fall back on the first name in the list.
+                # No default uv name exists. Fall back on the first name in the list.
                 else:
-                    currentUVName = self._availableUVNames[0]
+                    currentUVName = self._availableUVSetNames[0]
             try:            
-                self._uvNameComboBox.blockSignals(True)
-                self._uvNameComboBox.clear()
-                for uvName in self._availableUVNames:
-                    self._uvNameComboBox.addItem(uvName)
-                self._uvNameComboBox.setCurrentIndex(self._availableUVNames.index(currentUVName))
+                self._uvSetNameComboBox.blockSignals(True)
+                self._uvSetNameComboBox.clear()
+                for uvName in self._availableUVSetNames:
+                    self._uvSetNameComboBox.addItem(uvName)
+                self._uvSetNameComboBox.setCurrentIndex(self._availableUVSetNames.index(currentUVName))
             finally:
-                self._uvNameComboBox.blockSignals(False)
+                self._uvSetNameComboBox.blockSignals(False)
 
         # Update the view
         shapeData = self.getShapeData(extractors)
@@ -228,7 +225,7 @@ class UVViewerWindow(QtWidgets.QMainWindow):
         if extractors is None:
             extractors = self._extractors
         if uvName is None:
-            uvName = self.uvName()
+            uvName = self.uvSetName()
         if not extractors or not uvName:
             return {}
 
@@ -252,10 +249,10 @@ class UVViewerWindow(QtWidgets.QMainWindow):
         """ Update and set a new stage for the viewer. """
         self._view.clear()
         self._stage = stage
-        self._availableUVNames = []
-        self._uvNameComboBox.blockSignals(True)
-        self._uvNameComboBox.clear()
-        self._uvNameComboBox.blockSignals(False)
+        self._availableUVSetNames = []
+        self._uvSetNameComboBox.blockSignals(True)
+        self._uvSetNameComboBox.clear()
+        self._uvSetNameComboBox.blockSignals(False)
 
 
 if __name__ == "__main__":

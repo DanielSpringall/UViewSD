@@ -2,29 +2,17 @@ from PySide2 import QtWidgets, QtCore
 import numpy as np
 
 
-def stateFromEvent(event):
-    """ Test for a valid state from a given event and it's triggers. 
-
-    Args:
-        event (QtCore.QEvent): The event to test from.
-    Return:
-        (State or None): The state class that matches the event triggers, or None if no match can be found.
-    """
-    modifiers = QtWidgets.QApplication.keyboardModifiers()
-    button = event.button()
-    for state in AVAILABLE_STATES:
-        if state.canEnable(modifiers, button):
-            return state
-    return None
-
-
 class BaseState:
+    # Button trigger to enable/disable the state. Required.
+    EVENT_BUTTON = None
+    # Key modifiers held during trigger to enable/disable the state. Not required.
+    EVENT_MODIFIERS = None
+
     def __init__(self, event, camera, width, height):
         self._camera = camera
 
         self._initProjMat = self._camera.projectionMatrix()
         self._initGlScreenCoord = self._glScreenCoord(event)
-        self._initWorldCoord = self._camera.mapGlToWorld(self._initGlScreenCoord)
         self._initXScale = self._initProjMat[0][0]
         self._initYScale = self._initProjMat[1][1]
 
@@ -39,29 +27,39 @@ class BaseState:
         position = event.pos()
         return self._camera.mapScreenToGl([position.x(), position.y()])
 
-    @staticmethod
-    def canEnable(modifiers, button):
-        """ Test if this event should be enabled based on a given set of modifiers and buttons.
+    @classmethod
+    def canEnable(cls, modifiers, button):
+        """ Test if this event should be enabled based on a class defined list of pressed button and modifiers.
 
         Args:
             modifiers (Qt.KeyboardModifiers): The list of keyboard modifiers to test.
             button (Qt.MouseButton): The buttont to test.
         Return
-            bool: True if modifiers/button match the enable state requiorements. False otherwise.
+            bool: True if modifiers/button match the enable state requirements. False otherwise.
         """
-        return False
-
-    @staticmethod
-    def shouldDisable(button):
-        """ Test if this event should be disabled based on a given set of modifiers and buttons.
-
-        Args:
-            modifiers (Qt.KeyboardModifiers): The list of keyboard modifiers to test.
-            button (Qt.MouseButton): The buttont to test.
-        Return
-            bool: True if modifiers/button match the disable state requiorements. False otherwise.
-        """
+        if cls.EVENT_BUTTON is None:
+            raise RuntimeError("No button specified to test if {} can be enabled.".format(cls.__name__))
+        if button != cls.EVENT_BUTTON:
+            return False
+        if cls.EVENT_MODIFIERS is not None and cls.EVENT_MODIFIERS != modifiers:
+            return False
         return True
+
+    @classmethod
+    def shouldDisable(cls, button):
+        """ Test if this event should be disabled based on a class defined button.
+
+        Args:
+            button (Qt.MouseButton): The buttont to test.
+        Return
+            bool: True if button matches the disable state requirements. False otherwise.
+        """
+        # Note: We want the UX behaviour of being able to start the event with modifiers + button, 
+        # but then release the modifier whilst moving the mouse. So we only need to do a button
+        # comparison here.
+        if cls.EVENT_BUTTON is None:
+            raise RuntimeError("No button specified to test if {} should be disabled.".format(cls.__name__))
+        return button == cls.EVENT_BUTTON
 
     def update(self, event):
         """ Trigger and update of the state.
@@ -76,14 +74,12 @@ class BaseState:
 
 class ZoomState(BaseState):
     """ Mouse drag zoom in/out. """
+    EVENT_BUTTON = QtCore.Qt.RightButton
+    EVENT_MODIFIERS = QtCore.Qt.AltModifier
 
-    @staticmethod
-    def canEnable(modifiers, button):
-        return modifiers == QtCore.Qt.AltModifier and button == QtCore.Qt.RightButton
-
-    @staticmethod
-    def shouldDisable(button):
-        return button == QtCore.Qt.RightButton
+    def __init__(self, event, camera, width, height):
+        BaseState.__init__(self, event, camera, width, height)
+        self._initWorldCoord = self._camera.mapGlToWorld(self._initGlScreenCoord)
 
     def update(self, event):
         screenCoord = self._glScreenCoord(event)
@@ -102,14 +98,8 @@ class ZoomState(BaseState):
 
 class PanState(BaseState):
     """ Mouse drag pan state. """
-
-    @staticmethod
-    def canEnable(modifiers, button):
-        return modifiers == QtCore.Qt.AltModifier and button == QtCore.Qt.LeftButton
-
-    @staticmethod
-    def shouldDisable(button):
-        return button == QtCore.Qt.LeftButton
+    EVENT_BUTTON = QtCore.Qt.MiddleButton
+    EVENT_MODIFIERS = QtCore.Qt.AltModifier
 
     def update(self, event):
         screenCoord = self._glScreenCoord(event)
@@ -122,3 +112,19 @@ class PanState(BaseState):
 
 
 AVAILABLE_STATES = [PanState, ZoomState]
+
+
+def stateFromEvent(event):
+    """ Test for a valid state from a given event and it's triggers. 
+
+    Args:
+        event (QtCore.QEvent): The event to test from.
+    Return:
+        (State or None): The state class that matches the event triggers, or None if no match can be found.
+    """
+    modifiers = QtWidgets.QApplication.keyboardModifiers()
+    button = event.button()
+    for state in AVAILABLE_STATES:
+        if state.canEnable(modifiers, button):
+            return state
+    return None

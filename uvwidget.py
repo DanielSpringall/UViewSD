@@ -9,12 +9,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class ViewerWidget(QtWidgets.QOpenGLWidget):
+class UVViewerWidget(QtWidgets.QOpenGLWidget):
     def __init__(self, *args, **kwargs):
         QtWidgets.QOpenGLWidget.__init__(self, *args, **kwargs)
 
         self._painter = None
-        self._uvDataFont = None
+        self._uvInfoFont = None
+        self._gridNumbersFont = None
 
         self._activeState = None
         self._backgroundGrid = None
@@ -25,6 +26,7 @@ class ViewerWidget(QtWidgets.QOpenGLWidget):
         self._showCurrentMouseUVPosition = True
 
         self.setMouseTracking(self._showCurrentMouseUVPosition)
+        self.setMinimumSize(400, 400)
 
     # SHAPE MANAGEMENT
     def addShapes(self, shapes):
@@ -96,34 +98,48 @@ class ViewerWidget(QtWidgets.QOpenGLWidget):
     def keyPressEvent(self, event):
         if event.key() == QtCore.Qt.Key_F:
             self.focusOnBBox()
+            event.accept()
+        QtWidgets.QOpenGLWidget.keyPressEvent(self, event)
 
     def mousePressEvent(self, event):
+        """ Override to add custom state handling. """
         if not self._activeState:
             state = states.stateFromEvent(event)
             if state:
                 self._activeState = state(event, self._camera, self.width(), self.height())
+                event.accept()
+        QtWidgets.QOpenGLWidget.mousePressEvent(self, event)
 
     def mouseMoveEvent(self, event):
-        if self._activeState and self._activeState.update(event):
+        """ Override to add custom state handling. """
+        if (
+            (self._activeState and self._activeState.update(event)) or
+            self._showCurrentMouseUVPosition
+        ):
             self.update()
-        if self._showCurrentMouseUVPosition:
-            self.update()
+            event.accept()
+        QtWidgets.QOpenGLWidget.mouseMoveEvent(self, event)
 
     def mouseReleaseEvent(self, event):
+        """ Override to add custom state handling. """
         if self._activeState and self._activeState.shouldDisable(event.button()):
             self._activeState = None
+            event.accept()
+        QtWidgets.QOpenGLWidget.mouseReleaseEvent(self, event)
 
     def wheelEvent(self, event):
-        if self._activeState:
-            return
+        """ Override to add custom GL zoom. """
+        QtWidgets.QOpenGLWidget.wheelEvent(self, event)
 
-        pos = event.pos()
-        glCoords = self._camera.mapScreenToGl([pos.x(), pos.y()])
-        worldCoords = self._camera.mapGlToWorld(glCoords)
-        delta = event.angleDelta().y()
-        zoomAmount = 1 + (delta and delta // abs(delta)) * 0.03
-        self._camera.zoom(worldCoords, zoomAmount)
-        self.update()
+        # Perform graph zoom on mouse cursor position
+        if not self._activeState:
+            pos = event.pos()
+            glCoords = self._camera.mapScreenToGl([pos.x(), pos.y()])
+            worldCoords = self._camera.mapGlToWorld(glCoords)
+            delta = event.angleDelta().y()
+            zoomAmount = 1 + (delta and delta // abs(delta)) * 0.03
+            self._camera.zoom(worldCoords, zoomAmount)
+            self.update()
 
     # GL EVENTS
     def initializeGL(self):
@@ -131,6 +147,11 @@ class ViewerWidget(QtWidgets.QOpenGLWidget):
         self._backgroundGrid = shape.Grid()
         self._camera = camera.Camera2D(self.width(), self.height())
         self._painter = QtGui.QPainter()
+
+        self._gridNumbersFont = QtGui.QFont()
+        self._gridNumbersFont.setPointSize(8)
+        self._uvInfoFont = QtGui.QFont()
+        self._uvInfoFont.setPointSize(12)
 
     def resizeGL(self, width, height):
         """ Resize the GL viewport and update the camera with the new dimensions. """
@@ -183,6 +204,7 @@ class ViewerWidget(QtWidgets.QOpenGLWidget):
             painter.drawText(left, top, doubleWidth, height, QtCore.Qt.AlignLeft | QtCore.Qt.AlignBottom, text)
 
         painter.setPen(QtCore.Qt.black)
+        painter.setFont(self._gridNumbersFont)
         drawText(0)
         # Draw the rest of the text
         for i in range(1, self._backgroundGrid.TOTAL_LINES + 1):
@@ -192,15 +214,12 @@ class ViewerWidget(QtWidgets.QOpenGLWidget):
             drawText(-i, xAxis=False)
 
     def _drawMouseUVPosition(self, painter):
-        """ Draw the corresponding uv position from the current mouse position. """
+        """ Draw the corresponding uv position from the current mouse position over the widget. """
         cursor = QtGui.QCursor()
         position = self.mapFromGlobal(cursor.pos())
         uvPos = self._camera.mapScreenToWorld([position.x(), position.y()])
         displayString = "UV: %.3f, %.3f" % (uvPos[0], uvPos[1])
 
         painter.setPen(QtCore.Qt.white)
-        if self._uvDataFont is None:
-            self._uvDataFont = QtGui.QFont()
-            self._uvDataFont.setPointSize(14)
-        painter.setFont(self._uvDataFont)
-        painter.drawText(10, self.height() - 60, 200, 50, QtCore.Qt.AlignLeft | QtCore.Qt.AlignBottom, displayString)
+        painter.setFont(self._uvInfoFont)
+        painter.drawText(5, self.height() - 40, 200, 40, QtCore.Qt.AlignLeft | QtCore.Qt.AlignBottom, displayString)
