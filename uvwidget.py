@@ -14,11 +14,17 @@ class ViewerWidget(QtWidgets.QOpenGLWidget):
         QtWidgets.QOpenGLWidget.__init__(self, *args, **kwargs)
 
         self._painter = None
+        self._uvDataFont = None
+
         self._activeState = None
         self._backgroundGrid = None
         self._shapes = {}
         self._camera = None
+
         self._showGrid = True
+        self._showCurrentMouseUVPosition = True
+
+        self.setMouseTracking(self._showCurrentMouseUVPosition)
 
     # SHAPE MANAGEMENT
     def addShapes(self, shapes):
@@ -59,6 +65,33 @@ class ViewerWidget(QtWidgets.QOpenGLWidget):
         self._shapes = {}
         self.update()
 
+    # VIEW ACTIONS
+    def toggleGridVisibility(self):
+        """ Toggle the visible state of the grid lines and numbers in the view. """
+        self._showGrid = not self._showGrid
+        self.update()
+
+    def toggleMouseUVPositionDisplay(self):
+        """ Toggle the display of the uv position at the current mouse position in the bottom left of the widget. """
+        self._showCurrentMouseUVPosition = not self._showCurrentMouseUVPosition
+        self.setMouseTracking(self._showCurrentMouseUVPosition)
+        self.update()
+
+    def focusOnBBox(self):
+        """ Focus the viewer on the bbox surounding all the currently displayed shapes. """
+        shapes = list(self._shapes.values())
+        if not shapes:
+            self._camera.focus(0, 1, 1, 0)
+        else:
+            bbox = None
+            for _shape in shapes:
+                if bbox is None:
+                    bbox = _shape.bbox()
+                else:
+                    bbox.updateWithBBox(_shape.bbox())
+            self._camera.focus(bbox.xMin, bbox.xMax, bbox.yMax, bbox.yMin)
+        self.update()
+
     # QT EVENTS
     def keyPressEvent(self, event):
         if event.key() == QtCore.Qt.Key_F:
@@ -72,6 +105,8 @@ class ViewerWidget(QtWidgets.QOpenGLWidget):
 
     def mouseMoveEvent(self, event):
         if self._activeState and self._activeState.update(event):
+            self.update()
+        if self._showCurrentMouseUVPosition:
             self.update()
 
     def mouseReleaseEvent(self, event):
@@ -90,27 +125,7 @@ class ViewerWidget(QtWidgets.QOpenGLWidget):
         self._camera.zoom(worldCoords, zoomAmount)
         self.update()
 
-    def focusOnBBox(self):
-        """ Focus the viewer on the bbox surounding all the currently displayed shapes. """
-        shapes = list(self._shapes.values())
-        if not shapes:
-            self._camera.focus(0, 1, 1, 0)
-        else:
-            bbox = None
-            for _shape in shapes:
-                if bbox is None:
-                    bbox = _shape.bbox()
-                else:
-                    bbox.updateWithBBox(_shape.bbox())
-            self._camera.focus(bbox.xMin, bbox.xMax, bbox.yMax, bbox.yMin)
-        self.update()
-
     # GL EVENTS
-    def toggleGridVisibility(self):
-        """ Toggle the visible state of the grid lines and numbers in the view. """
-        self._showGrid = not self._showGrid
-        self.update()
-
     def initializeGL(self):
         """ Setup GL objects for the view ready for drawing. """
         self._backgroundGrid = shape.Grid()
@@ -138,10 +153,12 @@ class ViewerWidget(QtWidgets.QOpenGLWidget):
         self._painter.endNativePainting()
 
         if self._showGrid:
-            self.drawText(self._painter)
+            self._drawText(self._painter)
+        if self._drawMouseUVPosition:
+            self._drawMouseUVPosition(self._painter)
         self._painter.end()
 
-    def drawText(self, painter):
+    def _drawText(self, painter):
         """ Paint the grid values in the scene. """
         originCoord = self._camera.mapWorldToScreen([0.0, 0.0])
         offsetCoord = self._camera.mapWorldToScreen([0.1, 0.1])
@@ -173,3 +190,17 @@ class ViewerWidget(QtWidgets.QOpenGLWidget):
             drawText(-i, xAxis=True)
             drawText(i, xAxis=False)
             drawText(-i, xAxis=False)
+
+    def _drawMouseUVPosition(self, painter):
+        """ Draw the corresponding uv position from the current mouse position. """
+        cursor = QtGui.QCursor()
+        position = self.mapFromGlobal(cursor.pos())
+        uvPos = self._camera.mapScreenToWorld([position.x(), position.y()])
+        displayString = "UV: %.3f, %.3f" % (uvPos[0], uvPos[1])
+
+        painter.setPen(QtCore.Qt.white)
+        if self._uvDataFont is None:
+            self._uvDataFont = QtGui.QFont()
+            self._uvDataFont.setPointSize(14)
+        painter.setFont(self._uvDataFont)
+        painter.drawText(10, self.height() - 60, 200, 50, QtCore.Qt.AlignLeft | QtCore.Qt.AlignBottom, displayString)

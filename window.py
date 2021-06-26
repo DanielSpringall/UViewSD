@@ -41,7 +41,7 @@ class UVViewerWindow(QtWidgets.QMainWindow):
 
         self._view = uvwidget.ViewerWidget()
 
-        # layout.addLayout(self._setupControlLayout())
+        layout.addLayout(self._setupControlLayout())
         layout.addWidget(self._view)
 
         widget.setLayout(layout)
@@ -75,7 +75,6 @@ class UVViewerWindow(QtWidgets.QMainWindow):
         return layout
 
     def _setupConnections(self):
-        return
         self._gridToggleButton.clicked.connect(self._view.toggleGridVisibility)
         self._uvNameComboBox.currentIndexChanged.connect(self.refreshUVViewer)
 
@@ -119,7 +118,6 @@ class UVViewerWindow(QtWidgets.QMainWindow):
 
     def uvName(self):
         """ The current uvName selected in the UI by the user. """
-        return "st"
         return self._uvNameComboBox.currentText()
 
     # VIEWER MANAGEMENT
@@ -181,7 +179,7 @@ class UVViewerWindow(QtWidgets.QMainWindow):
             return
 
         # Update the uv name list
-        if False: #newUVNames:
+        if newUVNames:
             self._availableUVNames.sort()
             currentUVName = self.uvName()
             if not currentUVName:

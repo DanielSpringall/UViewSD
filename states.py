@@ -121,11 +121,4 @@ class PanState(BaseState):
         return True
 
 
-class ResizeState:
-    """ Custom state to handle the resize event of the UI. """
-
-    def __init__(self):
-        pass
-
-
 AVAILABLE_STATES = [PanState, ZoomState]
