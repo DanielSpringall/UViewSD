@@ -205,13 +205,6 @@ class UVViewerWindow(QtWidgets.QMainWindow):
         if shapeData:
             self._view.addShapes(shapeData)
 
-    def refreshUVViewer(self):
-        """ Refresh the viewer with the current cache extractors, and uvName. """
-        self._view.clear()
-        shapeData = self.getShapeData()
-        if shapeData:
-            self._view.addShapes(shapeData)
-
     def getShapeData(self, extractors=None, uvName=None):
         """ Get the relevant shape data to pass to the uv viewer from a list of extractors.
 
@@ -241,12 +234,15 @@ class UVViewerWindow(QtWidgets.QMainWindow):
             if positions is None or indices is None:
                 continue
 
-            edges = []
-            for edgeIndices in indices:
-                for index in edgeIndices:
-                    edges.extend(positions[index])
-            shapeData[extractor.prim().GetPath().pathString] = shape.UVShape(edges)
+            shapeData[extractor.prim().GetPath().pathString] = shape.UVShape(positions, indices)
         return shapeData
+
+    def refreshUVViewer(self):
+        """ Refresh the viewer with the current cache extractors, and uvName. """
+        self._view.clear()
+        shapeData = self.getShapeData()
+        if shapeData:
+            self._view.addShapes(shapeData)
 
     def setStage(self, stage):
         """ Update and set a new stage for the viewer. """
@@ -263,6 +259,9 @@ if __name__ == "__main__":
     QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_UseDesktopOpenGL)
     app = QtWidgets.QApplication([])
 
+    stage = None
+    primPaths = []
+
     # ATTIC
     # stage = Usd.Stage.Open("C:\\Libraries\\USD\\share\\usd\\Attic_NVIDIA\\Attic_NVIDIA.usd")
     # primPaths = ["/Root/Geometry/side_table_525/side_table"]
@@ -274,4 +273,5 @@ if __name__ == "__main__":
     window = UVViewerWindow(stage)
     window.addPrimPaths(primPaths)
     window.show()
+
     app.exec_()

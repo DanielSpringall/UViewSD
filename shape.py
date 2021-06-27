@@ -73,8 +73,9 @@ class UVExtractor:
         Args:
             uvName (str): The name of the uv prim to get the data for.
         Returns:
-            list[floats] | None, list[tuple(int, int)] | None:
-                A list of uv positions, and a list of tuples for each edges uv indices.
+            list[tuple(int, int)]:
+                A list of tuples corresponding to an edges start and end index . e.g. [(uvPos0, uvPos1), (uvPos1, uvPos2), ...]
+                where each index maps back to the uv positions. So uvPos0 -> uvPos1 would make up an edge.
         """
         if not self.isUVNameValid(uvName):
             logger.debug("%s not a valid uv name for %s. Valid names: %s.", uvName, self._mesh, self.validUVNames())
@@ -96,8 +97,9 @@ class UVExtractor:
         Args:
             primvar (Usd.Primvar): The primvar to extract the uv data from.
         Returns:
-            list[floats] | None, list[tuple(int, int)] | None:
-                A list of uv positions, and a list of tuples for each edges uv indices.
+            list[tuple(int, int)]:
+                A list of tuples corresponding to an edges start and end index . e.g. [(uvPos0, uvPos1), (uvPos1, uvPos2), ...]
+                where each index maps back to the uv positions. So uvPos0 -> uvPos1 would make up an edge.
         """
         faceVertCountList = self._mesh.GetFaceVertexCountsAttr().Get()
         uvPositions = primvar.Get()
@@ -111,8 +113,9 @@ class UVExtractor:
         Args:
             primvar (Usd.Primvar): The primvar to extract the uv data from.
         Returns:
-            list[floats] | None, list[tuple(int, int)] | None:
-                A list of uv positions, and a list of tuples for each edges uv indices.
+            list[tuple(int, int)]:
+                A list of tuples corresponding to an edges start and end index . e.g. [(uvPos0, uvPos1), (uvPos1, uvPos2), ...]
+                where each index maps back to the uv positions. So uvPos0 -> uvPos1 would make up an edge.
         """
         faceVertCountList = self._mesh.GetFaceVertexCountsAttr().Get()
         faceVertexIndices = self._mesh.GetFaceVertexIndicesAttr().Get()
@@ -133,8 +136,12 @@ class UVExtractor:
                 List of number of indices per face.
             indexMaps list[list[]]:
                 List of index maps to map a given face vert id back to it's corresponding uv index.
+        Returns:
+            list[tuple(int, int)]:
+                A list of tuples corresponding to an edges start and end index . e.g. [(uvPos0, uvPos1), (uvPos1, uvPos2), ...]
+                where each index maps back to the uv positions. So uvPos0 -> uvPos1 would make up an edge.
         """
-        edges = []
+        edgeIndices = []
         consumedIndices = 0
         for faceVertCount in faceVertCountList:
             for i in range(faceVertCount):
@@ -143,9 +150,9 @@ class UVExtractor:
                 for indexMap in indexMaps:
                     firstIndex = indexMap[firstIndex]
                     secondIndex = indexMap[secondIndex]
-                edges.append((firstIndex, secondIndex))
+                edgeIndices.append((firstIndex, secondIndex))
             consumedIndices += faceVertCount
-        return edges
+        return edgeIndices
 
 
 class BBox:
@@ -163,15 +170,15 @@ class BBox:
             self.yMin = pos1[1]
             self.yMax = pos0[1]
 
-    def updateWithPosition(self, xPos, yPos):
-        if self.xMin > xPos:
-            self.xMin = xPos
-        elif self.xMax < xPos:
-            self.xMax = xPos
-        if self.yMin > yPos:
-            self.yMin = yPos
-        elif self.yMax < yPos:
-            self.yMax = yPos
+    def updateWithPosition(self, pos):
+        if self.xMin > pos[0]:
+            self.xMin = pos[0]
+        elif self.xMax < pos[0]:
+            self.xMax = pos[0]
+        if self.yMin > pos[1]:
+            self.yMin = pos[1]
+        elif self.yMax < pos[1]:
+            self.yMax = pos[1]
 
     def updateWithBBox(self, otherBBox):
         if self.xMin > otherBBox._xMin:
@@ -186,60 +193,61 @@ class BBox:
 
 # OPENGL
 class UVShape:
-    def __init__(self, edges):
+    def __init__(self, positions, indices):
         """ OpenGl class for drawing uv edges.
-        
-        Args:
-            edges (list[float]):
-                A list of uv positions. and the edges they make up.
-                [uvPos0.x, uvPos0.y, uvPos1.x, uvPose1.y] * number of edges.
-                Where uvPose0 and uvPos1 make up an edge.
-        """
-        self.bound = False
-        self._vao = None
-        self._color = (1.0, 1.0, 1.0)
-        self._shader = None
-        self._positions = np.array(edges, dtype=np.float32)
-        self._numUVs = int(len(self._positions) / 2)
 
+        Args:
+            positions (list[float]):
+                A flat list of uv positions. e.g. [uvPos0.u, uvPos0.v, uvPos1.u, uvPose1.v, ...]
+            indices (list[tuple(int, int)]):
+                A list of tuples corresponding to an edges start and end index . e.g. [(uvPos0, uvPos1), (uvPos1, uvPos2), ...]
+                where each index maps back to the uv positions. So uvPos0 -> uvPos1 would make up an edge.
+        """
+        self._positions = np.array(positions, dtype=np.float32)
+        self._indices = np.array(indices, dtype=np.int).flatten()
+        self._numEdges = self._indices.size
+
+        self._color = (1.0, 1.0, 1.0)
+        self._vao = None
+        self._shader = None
         self._bbox = None
+        self._bound = False
 
     def bbox(self):
         """ Calculate the bounding box from the uv positions.
-        
+
         Returns:
             BBox: The bbox surounding the uv positions.
         """
         if self._bbox is None:
-            bbox = BBox(
-                [self._positions[0], self._positions[1]],
-                [self._positions[2], self._positions[3]],
-            )
-            for i in range(2, self._numUVs):
-                xPos = self._positions[i * 2]
-                yPos = self._positions[i * 2 + 1]
-                bbox.updateWithPosition(xPos, yPos)
+            if self._numEdges < 1:
+                return None
+
+            bbox = BBox(self._positions[self._indices[0]], self._positions[self._indices[1]])
+            for i in range(1, self._numEdges):
+                bbox.updateWithPosition(self._positions[self._indices[i]])
             self._bbox = bbox
 
         return self._bbox
 
     def initializeGLData(self):
-        """ Initialize the OpenGL data for drawing. Should only be called once. """
         self._shader = shader.getLineShader()
         self._vao = GL.glGenVertexArrays(1)
-        pbo = GL.glGenBuffers(1)
+        [pbo, ebo] = GL.glGenBuffers(2)
 
         GL.glBindVertexArray(self._vao)
+        # Positions
         GL.glBindBuffer(GL.GL_ARRAY_BUFFER, pbo)
-
-        GL.glEnableVertexAttribArray(0)
-        GL.glVertexAttribPointer(0, 2, GL.GL_FLOAT, GL.GL_FALSE, 0, c_void_p(0))
-
         GL.glBufferData(GL.GL_ARRAY_BUFFER, self._positions.nbytes, self._positions, GL.GL_STATIC_DRAW)
+        # Indices
+        GL.glBindBuffer(GL.GL_ELEMENT_ARRAY_BUFFER, ebo)
+        GL.glBufferData(GL.GL_ELEMENT_ARRAY_BUFFER, self._indices.nbytes, self._indices, GL.GL_STATIC_DRAW)
+
+        GL.glVertexAttribPointer(0, 2, GL.GL_FLOAT, GL.GL_FALSE, 0, c_void_p(0))
+        GL.glEnableVertexAttribArray(0)
 
         GL.glBindBuffer(GL.GL_ARRAY_BUFFER, 0)
         GL.glBindVertexArray(0)
-        self.bound = True
 
     def draw(self, projectionMatrix):
         """ OpenGl draw call.
@@ -247,16 +255,16 @@ class UVShape:
         Args:
             projectionMatrix (float[16]): The projection matrix to pass the shader.
         """
-        if not self.bound:
+        if not self._bound:
             self.initializeGLData()
 
         self._shader.use()
         self._shader.setMatrix4f("viewMatrix", projectionMatrix)
+        self._shader.setVec3f("color", self._color)
 
         GL.glLineWidth(1.0)
         GL.glBindVertexArray(self._vao)
-        self._shader.setVec3f("color", self._color)
-        GL.glDrawArrays(GL.GL_LINES, 0, self._numUVs)
+        GL.glDrawElements(GL.GL_LINES, self._numEdges, GL.GL_UNSIGNED_INT, None)
         GL.glBindVertexArray(0)
 
 
@@ -349,8 +357,16 @@ class Grid:
         self._shader.setMatrix4f("viewMatrix", projectionMatrix)
 
         GL.glLineWidth(1.0)
+
+        previousColor = None
         for data in self._lineData:
+            # Set color
+            color = data["color"]
+            if color != previousColor:
+                self._shader.setVec3f("color", color)
+                previousColor = color
+
+            # Draw
             GL.glBindVertexArray(data["vao"])
-            self._shader.setVec3f("color", data["color"])
             GL.glDrawArrays(GL.GL_LINES, 0, data["numVerts"])
             GL.glBindVertexArray(0)
