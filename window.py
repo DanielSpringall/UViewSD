@@ -225,7 +225,7 @@ class UVViewerWindow(QtWidgets.QMainWindow):
         if not extractors or not uvName:
             return {}
 
-        shapeData = {}
+        shapeData = []
         for extractor in extractors:
             if not extractor.isUVNameValid(uvName):
                 continue
@@ -234,7 +234,8 @@ class UVViewerWindow(QtWidgets.QMainWindow):
             if positions is None or indices is None:
                 continue
 
-            shapeData[extractor.prim().GetPath().pathString] = shape.UVShape(positions, indices)
+            identifier = extractor.prim().GetPath().pathString
+            shapeData.append(shape.UVShape(positions, indices, identifier))
         return shapeData
 
     def refreshUVViewer(self):

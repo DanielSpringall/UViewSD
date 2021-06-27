@@ -22,7 +22,7 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
 
         self._activeState = None
         self._backgroundGrid = None
-        self._shapes = {}
+        self._shapes = []
         self._camera = None
 
         self._showGrid = True
@@ -37,37 +37,47 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
         Existing shapes with the same name will be overridden.
 
         Args:
-            shapes (dict{name: shape.UVShape}):
-                Dictionary of the shapes to draw. Keys are the identifiers for each shape, values are the shape data.
+            shapes (list[shape.UVShape]): List of shapes to draw.
         """
-        for shapeName in shapes:
-            self._shapes[shapeName] = shapes[shapeName]
+        shapeNamesToAdd = [shape.identifier for shape in shapes]
+        currentShapeNames = [shape.identifier for shape in self._shapes]
+        shapesToRemove = list(set(shapeNamesToAdd).intersection(set(currentShapeNames)))
+        if shapesToRemove:
+            self.removeShapes(shapesToRemove, update=False)
+        self._shapes.extend(shapes)
         self.update()
 
-    def removeShapes(self, shapeNames):
+    def removeShapes(self, shapeNames, update=True):
         """ CLear a list of shapes from the view
         
         Args:
             shapeNames (list[str]): Names of the shapes to remove from the view.
+            update (bool): If true, trigger a UI update if any shapes have been removed.
         """
         if not self._shapes:
             return
 
-        shapeRemoved = False
+        shapesRemoved = False
         for shapeName in shapeNames:
-            if shapeName not in self._shapes:
+            shapeToRemove = None
+            for _shape in self._shapes:
+                if _shape.identifier() == shapeName:
+                    shapeToRemove = _shape
+                    break
+            if shapeToRemove is None:
                 continue
-            del self._shapes[shapeName]
-            shapeRemoved = True
+            self._shapes.remove(shapeToRemove)
+            del shapeToRemove
+            shapesRemoved = True
 
-        if shapeRemoved:
+        if shapesRemoved and update:
             self.update()
 
     def clear(self):
         """ Clear all the current shapes drawn in the view. """
         if not self._shapes:
             return
-        self._shapes = {}
+        self._shapes = []
         self.update()
 
     # VIEW ACTIONS
@@ -84,12 +94,11 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
 
     def focusOnBBox(self):
         """ Focus the viewer on the bbox surounding all the currently displayed shapes. """
-        shapes = list(self._shapes.values())
-        if not shapes:
+        if not self._shapes:
             self._camera.focus(0, 1, 1, 0)
         else:
             bbox = None
-            for _shape in shapes:
+            for _shape in self._shapes:
                 if bbox is None:
                     bbox = _shape.bbox()
                 else:
@@ -172,8 +181,8 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
         projectionMatrix = self._camera.glProjectionMatrix()
         if self._showGrid:
             self._backgroundGrid.draw(projectionMatrix)
-        for shape in self._shapes.values():
-            shape.draw(projectionMatrix)
+        for _shape in self._shapes:
+            _shape.draw(projectionMatrix)
         self._painter.endNativePainting()
 
         if self._showGrid:

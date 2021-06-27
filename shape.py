@@ -193,7 +193,7 @@ class BBox:
 
 # OPENGL
 class UVShape:
-    def __init__(self, positions, indices):
+    def __init__(self, positions, indices, identifier):
         """ OpenGl class for drawing uv edges.
 
         Args:
@@ -206,12 +206,24 @@ class UVShape:
         self._positions = np.array(positions, dtype=np.float32)
         self._indices = np.array(indices, dtype=np.int).flatten()
         self._numEdges = self._indices.size
+        self._identifier = identifier
 
         self._color = (1.0, 1.0, 1.0)
         self._vao = None
         self._shader = None
         self._bbox = None
         self._bound = False
+
+    def __del__(self):
+        """ Delete any bound buffers. """
+        buffersToDelete = []
+        if self._vao is not None:
+            buffersToDelete.append(self._vao)
+        if buffersToDelete:
+            GL.glDeleteBuffers(len(buffersToDelete), buffersToDelete)
+
+    def identifier(self):
+        return self._identifier
 
     def bbox(self):
         """ Calculate the bounding box from the uv positions.
@@ -274,7 +286,7 @@ class Grid:
     TOTAL_LINES = NUM_GRIDS_FROM_ORIGIN * LINE_INTERVALS
 
     def __init__(self):
-        """ OpenGL class for drawin the all the lines that make up the background grid for the uv viewer. """
+        """ OpenGL class for drawing all the lines that make up the background grid for the uv viewer. """
         self._shader = shader.getLineShader()
 
         incrementalLines = []
@@ -315,6 +327,12 @@ class Grid:
             self.initializeGLData(np.array(vLine, dtype=np.float32), color=vColor),
         ]
 
+    def __del__(self):
+        """ Delete any bound buffers. """
+        buffersToDelete = [data["vao"] for data in self._lineData]
+        if buffersToDelete:
+            GL.glDeleteBuffers(len(buffersToDelete), buffersToDelete)
+
     def initializeGLData(self, lineData, color):
         """ Initialize the OpenGL data for a given set of line data.
 
@@ -325,7 +343,6 @@ class Grid:
             dict{vao: int, numVerts: int, color: tuple(int, int, int)}:
                 OpenGL data used to draw the lines with.
         """
-
         vao = GL.glGenVertexArrays(1)
         pbo = GL.glGenBuffers(1)
 
