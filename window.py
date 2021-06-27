@@ -23,9 +23,7 @@ class UVViewerWindow(QtWidgets.QMainWindow):
         # UI objects
         self._view = None
         self._gridToggleButton = None
-        self._loadTextureButton = None
-        self._toggleTextureButton = None
-        self._textureOptionComboBox = None
+        self._uvBorderHighlightToggleButton = None
         self._uvSetNameComboBox = None
         self._uvNameLockCheckBox = None
 
@@ -71,16 +69,23 @@ class UVViewerWindow(QtWidgets.QMainWindow):
         self._gridToggleButton.setFixedWidth(25)
         self._gridToggleButton.setToolTip("Enable/disable visibility of the grid lines and numbers from the view.")
 
+        self._uvBorderHighlightToggleButton = QtWidgets.QPushButton()
+        self._uvBorderHighlightToggleButton.setIcon(self.style().standardIcon(getattr(QtWidgets.QStyle, "SP_DialogSaveButton")))
+        self._uvBorderHighlightToggleButton.setFixedWidth(25)
+        self._uvBorderHighlightToggleButton.setToolTip("Enable/disable highlight of uv boundary edges.")
+
         layout.addWidget(uvOptionsLabel)
         layout.addWidget(self._uvSetNameComboBox)
         layout.addSpacing(3)
         layout.addWidget(spacerLine)
         layout.addSpacing(3)
+        layout.addWidget(self._uvBorderHighlightToggleButton)
         layout.addWidget(self._gridToggleButton)
         return layout
 
     def _setupConnections(self):
         self._gridToggleButton.clicked.connect(self._view.toggleGridVisibility)
+        self._uvBorderHighlightToggleButton.clicked.connect(self._view.toggleUVEdgeBoundaryHighlight)
         self._uvSetNameComboBox.currentIndexChanged.connect(self.refreshUVViewer)
 
     def keyPressEvent(self, event):

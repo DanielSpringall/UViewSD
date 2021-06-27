@@ -27,6 +27,7 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
 
         self._showGrid = True
         self._showCurrentMouseUVPosition = True
+        self._showUVEdgeBoundaryHighlight = True
 
         self.setMouseTracking(self._showCurrentMouseUVPosition)
         self.setMinimumSize(400, 400)
@@ -90,6 +91,11 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
         """ Toggle the display of the uv position at the current mouse position in the bottom left of the widget. """
         self._showCurrentMouseUVPosition = not self._showCurrentMouseUVPosition
         self.setMouseTracking(self._showCurrentMouseUVPosition)
+        self.update()
+
+    def toggleUVEdgeBoundaryHighlight(self):
+        """ Toggle the display of uv edge boundary highlights. """
+        self._showUVEdgeBoundaryHighlight = not self._showUVEdgeBoundaryHighlight
         self.update()
 
     def focusOnBBox(self):
@@ -182,7 +188,7 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
         if self._showGrid:
             self._backgroundGrid.draw(projectionMatrix)
         for _shape in self._shapes:
-            _shape.draw(projectionMatrix)
+            _shape.draw(projectionMatrix, drawBoundaries=self._showUVEdgeBoundaryHighlight)
         self._painter.endNativePainting()
 
         if self._showGrid:

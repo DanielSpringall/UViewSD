@@ -154,41 +154,31 @@ class UVExtractor:
             consumedIndices += faceVertCount
         return edgeIndices
 
+    @staticmethod
+    def edgeBoundariesFromEdgeIndices(uvIndices):
+        """ Get the indices that make up the uv boundary edges.
 
-class BBox:
-    def __init__(self, pos0, pos1):
-        if pos0[0] <= pos1[0]:
-            self.xMin = pos0[0]
-            self.xMax = pos1[0]
-        else:
-            self.xMin = pos1[0]
-            self.xMax = pos0[0]
-        if pos0[1] <= pos1[1]:
-            self.yMin = pos0[1]
-            self.yMax = pos1[1]
-        else:
-            self.yMin = pos1[1]
-            self.yMax = pos0[1]
+        Args:
+            uvIndices list[tuple(int, int)]:
+                A list of tuples corresponding to an edges start and end index . e.g. [(uvPos0, uvPos1), (uvPos1, uvPos2), ...]
+                where each index maps back to the uv positions. So uvPos0 -> uvPos1 would make up an edge.
+        Returns:
+            list[tuple(int, int)]:
+                A list of tuples corresponding to start/end uv positions of boundary uv edges.
+        """
+        edgeCountMap = {}
+        for uvEdge in uvIndices:
+            edge = Edge(uvEdge[0], uvEdge[1])
+            if edge in edgeCountMap:
+                edgeCountMap[edge] += 1
+            else:
+                edgeCountMap[edge] = 1
 
-    def updateWithPosition(self, pos):
-        if self.xMin > pos[0]:
-            self.xMin = pos[0]
-        elif self.xMax < pos[0]:
-            self.xMax = pos[0]
-        if self.yMin > pos[1]:
-            self.yMin = pos[1]
-        elif self.yMax < pos[1]:
-            self.yMax = pos[1]
-
-    def updateWithBBox(self, otherBBox):
-        if self.xMin > otherBBox._xMin:
-            self.xMin = otherBBox._xMin
-        if self.xMax < otherBBox._xMax:
-            self.xMax = otherBBox._xMax
-        if self.yMin > otherBBox._yMin:
-            self.yMin = otherBBox._yMin
-        if self.yMax > otherBBox._yMax:
-            self.yMax = otherBBox._yMax
+        boundaryEdges = []
+        for edge, count in edgeCountMap.items():
+            if count == 1:
+                boundaryEdges.append([edge.startIndex, edge.endIndex])
+        return boundaryEdges
 
 
 # OPENGL
@@ -204,23 +194,17 @@ class UVShape:
                 where each index maps back to the uv positions. So uvPos0 -> uvPos1 would make up an edge.
         """
         self._positions = np.array(positions, dtype=np.float32)
-        self._indices = np.array(indices, dtype=np.int).flatten()
-        self._numEdges = self._indices.size
+        self._indices = np.array(indices, dtype=np.int)
+        self._numUVs = self._indices.flatten().size
         self._identifier = identifier
+        self._boundaryIndices = None
+        self._numBoundaryUVs = None
 
         self._color = (1.0, 1.0, 1.0)
+        self._bao = None
         self._vao = None
         self._shader = None
         self._bbox = None
-        self._bound = False
-
-    def __del__(self):
-        """ Delete any bound buffers. """
-        buffersToDelete = []
-        if self._vao is not None:
-            buffersToDelete.append(self._vao)
-        if buffersToDelete:
-            GL.glDeleteBuffers(len(buffersToDelete), buffersToDelete)
 
     def identifier(self):
         return self._identifier
@@ -232,18 +216,22 @@ class UVShape:
             BBox: The bbox surounding the uv positions.
         """
         if self._bbox is None:
-            if self._numEdges < 1:
+            if self._numUVs <= 1:
                 return None
 
-            bbox = BBox(self._positions[self._indices[0]], self._positions[self._indices[1]])
-            for i in range(1, self._numEdges):
-                bbox.updateWithPosition(self._positions[self._indices[i]])
+            edge = self._positions[self._indices[0]]
+            bbox = BBox(edge[0], edge[1])
+            for i in range(1, int(self._numUVs / 2)):
+                edge = self._positions[self._indices[i]]
+                bbox.updateWithPosition(edge[0])
+                bbox.updateWithPosition(edge[1])
             self._bbox = bbox
 
         return self._bbox
 
     def initializeGLData(self):
         self._shader = shader.getLineShader()
+
         self._vao = GL.glGenVertexArrays(1)
         [pbo, ebo] = GL.glGenBuffers(2)
 
@@ -253,7 +241,7 @@ class UVShape:
         GL.glBufferData(GL.GL_ARRAY_BUFFER, self._positions.nbytes, self._positions, GL.GL_STATIC_DRAW)
         # Indices
         GL.glBindBuffer(GL.GL_ELEMENT_ARRAY_BUFFER, ebo)
-        GL.glBufferData(GL.GL_ELEMENT_ARRAY_BUFFER, self._indices.nbytes, self._indices, GL.GL_STATIC_DRAW)
+        GL.glBufferData(GL.GL_ELEMENT_ARRAY_BUFFER, self._indices.nbytes, self._indices.flatten(), GL.GL_STATIC_DRAW)
 
         GL.glVertexAttribPointer(0, 2, GL.GL_FLOAT, GL.GL_FALSE, 0, c_void_p(0))
         GL.glEnableVertexAttribArray(0)
@@ -261,14 +249,37 @@ class UVShape:
         GL.glBindBuffer(GL.GL_ARRAY_BUFFER, 0)
         GL.glBindVertexArray(0)
 
-    def draw(self, projectionMatrix):
+    def initializeBoundaryGLData(self):
+        self._boundaryIndices = np.array(UVExtractor.edgeBoundariesFromEdgeIndices(self._indices), dtype=np.int)
+        self._numBoundaryUVs = self._boundaryIndices.flatten().size
+
+        self._bao = GL.glGenVertexArrays(1)
+        [pbo, ebo] = GL.glGenBuffers(2)
+
+        GL.glBindVertexArray(self._bao)
+        # Positions
+        GL.glBindBuffer(GL.GL_ARRAY_BUFFER, pbo)
+        GL.glBufferData(GL.GL_ARRAY_BUFFER, self._positions.nbytes, self._positions, GL.GL_STATIC_DRAW)
+        # Indices
+        GL.glBindBuffer(GL.GL_ELEMENT_ARRAY_BUFFER, ebo)
+        GL.glBufferData(GL.GL_ELEMENT_ARRAY_BUFFER, self._boundaryIndices.nbytes, self._boundaryIndices.flatten(), GL.GL_STATIC_DRAW)
+
+        GL.glVertexAttribPointer(0, 2, GL.GL_FLOAT, GL.GL_FALSE, 0, c_void_p(0))
+        GL.glEnableVertexAttribArray(0)
+
+        GL.glBindBuffer(GL.GL_ARRAY_BUFFER, 0)
+        GL.glBindVertexArray(0)
+
+    def draw(self, projectionMatrix, drawBoundaries=False):
         """ OpenGl draw call.
 
         Args:
             projectionMatrix (float[16]): The projection matrix to pass the shader.
         """
-        if not self._bound:
+        if not self._vao:
             self.initializeGLData()
+        if drawBoundaries and not self._bao:
+            self.initializeBoundaryGLData()
 
         self._shader.use()
         self._shader.setMatrix4f("viewMatrix", projectionMatrix)
@@ -276,7 +287,13 @@ class UVShape:
 
         GL.glLineWidth(1.0)
         GL.glBindVertexArray(self._vao)
-        GL.glDrawElements(GL.GL_LINES, self._numEdges, GL.GL_UNSIGNED_INT, None)
+        GL.glDrawElements(GL.GL_LINES, self._numUVs, GL.GL_UNSIGNED_INT, None)
+
+        if drawBoundaries:
+            GL.glLineWidth(3.0)
+            GL.glBindVertexArray(self._bao)
+            GL.glDrawElements(GL.GL_LINES, self._numBoundaryUVs, GL.GL_UNSIGNED_INT, None)
+
         GL.glBindVertexArray(0)
 
 
@@ -326,12 +343,6 @@ class Grid:
             self.initializeGLData(np.array(uLine, dtype=np.float32), color=uColor),
             self.initializeGLData(np.array(vLine, dtype=np.float32), color=vColor),
         ]
-
-    def __del__(self):
-        """ Delete any bound buffers. """
-        buffersToDelete = [data["vao"] for data in self._lineData]
-        if buffersToDelete:
-            GL.glDeleteBuffers(len(buffersToDelete), buffersToDelete)
 
     def initializeGLData(self, lineData, color):
         """ Initialize the OpenGL data for a given set of line data.
@@ -387,3 +398,56 @@ class Grid:
             GL.glBindVertexArray(data["vao"])
             GL.glDrawArrays(GL.GL_LINES, 0, data["numVerts"])
             GL.glBindVertexArray(0)
+
+
+# UTILITIES
+class BBox:
+    def __init__(self, pos0, pos1):
+        if pos0[0] <= pos1[0]:
+            self.xMin = pos0[0]
+            self.xMax = pos1[0]
+        else:
+            self.xMin = pos1[0]
+            self.xMax = pos0[0]
+        if pos0[1] <= pos1[1]:
+            self.yMin = pos0[1]
+            self.yMax = pos1[1]
+        else:
+            self.yMin = pos1[1]
+            self.yMax = pos0[1]
+
+    def updateWithPosition(self, pos):
+        if self.xMin > pos[0]:
+            self.xMin = pos[0]
+        elif self.xMax < pos[0]:
+            self.xMax = pos[0]
+        if self.yMin > pos[1]:
+            self.yMin = pos[1]
+        elif self.yMax < pos[1]:
+            self.yMax = pos[1]
+
+    def updateWithBBox(self, otherBBox):
+        if self.xMin > otherBBox._xMin:
+            self.xMin = otherBBox._xMin
+        if self.xMax < otherBBox._xMax:
+            self.xMax = otherBBox._xMax
+        if self.yMin > otherBBox._yMin:
+            self.yMin = otherBBox._yMin
+        if self.yMax > otherBBox._yMax:
+
+            self.yMax = otherBBox._yMax
+
+
+class Edge:
+    def __init__(self, startIndex, endIndex):
+        self.startIndex = min(startIndex, endIndex)
+        self.endIndex = max(startIndex, endIndex)
+
+    def __hash__(self):
+        return hash((self.startIndex, self.endIndex))
+
+    def __eq__(self, otherEdge): 
+        return (
+            self.startIndex == otherEdge.startIndex and
+            self.endIndex == otherEdge.endIndex
+        )
