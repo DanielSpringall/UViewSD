@@ -267,8 +267,12 @@ if __name__ == "__main__":
     # primPaths = ["/Root/Geometry/side_table_525/side_table"]
 
     # KITCHEN
-    stage = Usd.Stage.Open("C:\\Libraries\\USD\\share\\usd\\kitchenSet\\Kitchen_set.usd")
-    primPaths = ['/Kitchen_set/Props_grp/North_grp/NorthWall_grp/CastIron_1/Geom/pCylinder151']
+    # stage = Usd.Stage.Open("C:\\Libraries\\USD\\share\\usd\\kitchenSet\\Kitchen_set.usd")
+    # primPaths = ['/Kitchen_set/Props_grp/North_grp/NorthWall_grp/CastIron_1/Geom/pCylinder151']
+
+    # TESTS
+    stage = Usd.Stage.Open("C:\\Users\\Daniel\\Projects\\Python\\UViewSD\\tests\\data\\uvborders.usda")
+    primPaths = ['/cube']
 
     window = UVViewerWindow(stage)
     window.addPrimPaths(primPaths)
