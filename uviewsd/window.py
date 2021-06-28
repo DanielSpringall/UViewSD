@@ -59,7 +59,7 @@ class UVViewerWindow(QtWidgets.QMainWindow):
 
         uvOptionsLabel = QtWidgets.QLabel()
         uvOptionsLabel.setText("UV Set:")
-        uvOptionsLabel.setFixedWidth(35)
+        uvOptionsLabel.setFixedWidth(40)
         self._uvSetNameComboBox = QtWidgets.QComboBox()
         self._uvSetNameComboBox.setToolTip("UV set name extracted from the selected USD prims.")
         self._uvSetNameComboBox.setMinimumWidth(200)
