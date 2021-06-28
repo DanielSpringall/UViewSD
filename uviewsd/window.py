@@ -28,6 +28,7 @@ class UVViewerWindow(QtWidgets.QMainWindow):
         self._view = None
         self._gridToggleButton = None
         self._uvBorderHighlightToggleButton = None
+        self._uvDataLabelButton = None
         self._uvSetNameComboBox = None
         self._uvNameLockCheckBox = None
 
@@ -77,6 +78,11 @@ class UVViewerWindow(QtWidgets.QMainWindow):
         self._uvBorderHighlightToggleButton.setFixedWidth(25)
         self._uvBorderHighlightToggleButton.setToolTip("Enable/disable highlight of uv boundary edges.")
 
+        self._uvDataLabelButton = QtWidgets.QPushButton()
+        self._uvDataLabelButton.setIcon(QtGui.QIcon(os.path.join(ICON_DIR, "uvdata.png")))
+        self._uvDataLabelButton.setFixedWidth(25)
+        self._uvDataLabelButton.setToolTip("Enable/disable display of mouse uv position.")
+
         layout.addWidget(uvOptionsLabel)
         layout.addWidget(self._uvSetNameComboBox)
         layout.addSpacing(3)
@@ -84,11 +90,13 @@ class UVViewerWindow(QtWidgets.QMainWindow):
         layout.addSpacing(3)
         layout.addWidget(self._uvBorderHighlightToggleButton)
         layout.addWidget(self._gridToggleButton)
+        layout.addWidget(self._uvDataLabelButton)
         return layout
 
     def _setupConnections(self):
         self._gridToggleButton.clicked.connect(self._view.toggleGridVisibility)
         self._uvBorderHighlightToggleButton.clicked.connect(self._view.toggleUVEdgeBoundaryHighlight)
+        self._uvDataLabelButton.clicked.connect(self._view.toggleMouseUVPositionDisplay)
         self._uvSetNameComboBox.currentIndexChanged.connect(self.refreshUVViewer)
 
     def keyPressEvent(self, event):
