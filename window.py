@@ -3,12 +3,16 @@
 # Please see the LICENSE file that should have been included as part of this package.
 import shape
 import uvwidget
+import os
 
-from PySide2 import QtWidgets, QtCore
+from PySide2 import QtWidgets, QtCore, QtGui
 from pxr import Usd, UsdGeom
 
 import logging
 logger = logging.getLogger(__name__)
+
+
+ICON_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "icons")
 
 
 class UVViewerWindow(QtWidgets.QMainWindow):
@@ -30,8 +34,7 @@ class UVViewerWindow(QtWidgets.QMainWindow):
         self.setWindowTitle("UViewSD")
         self._setupUI()
         self._setupConnections()
-
-        self.setFocus()
+        self._view.setFocus()
 
     # UI
     def _setupUI(self):
@@ -65,7 +68,7 @@ class UVViewerWindow(QtWidgets.QMainWindow):
         spacerLine.setFrameShadow(QtWidgets.QFrame.Sunken)
 
         self._gridToggleButton = QtWidgets.QPushButton()
-        self._gridToggleButton.setIcon(self.style().standardIcon(getattr(QtWidgets.QStyle, "SP_DialogSaveButton")))
+        self._gridToggleButton.setIcon(QtGui.QIcon(os.path.join(ICON_DIR, "grid.png")))
         self._gridToggleButton.setFixedWidth(25)
         self._gridToggleButton.setToolTip("Enable/disable visibility of the grid lines and numbers from the view.")
 
@@ -89,10 +92,8 @@ class UVViewerWindow(QtWidgets.QMainWindow):
         self._uvSetNameComboBox.currentIndexChanged.connect(self.refreshUVViewer)
 
     def keyPressEvent(self, event):
-        # Ensure we pass events through to the main widget.
         self._view.keyPressEvent(event)
-        if not event.isAccepted():
-            QtWidgets.QMainWindow.keyPressEvent(self, event)
+        QtWidgets.QMainWindow.keyPressEvent(self, event)
 
     # UV NAME
     @staticmethod

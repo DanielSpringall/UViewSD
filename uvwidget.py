@@ -26,7 +26,7 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
         self._camera = None
 
         self._showGrid = True
-        self._showCurrentMouseUVPosition = True
+        self._showCurrentMouseUVPosition = False
         self._showUVEdgeBoundaryHighlight = True
 
         self.setMouseTracking(self._showCurrentMouseUVPosition)
@@ -75,7 +75,7 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
             self.update()
 
     def clear(self):
-        """ Clear all the current shapes drawn in the view. """
+        """ Clear all the shapes drawn in the view. """
         if not self._shapes:
             return
         self._shapes = []
@@ -116,7 +116,6 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
     def keyPressEvent(self, event):
         if event.key() == QtCore.Qt.Key_F:
             self.focusOnBBox()
-            event.accept()
         QtWidgets.QOpenGLWidget.keyPressEvent(self, event)
 
     def mousePressEvent(self, event):
@@ -125,8 +124,7 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
             state = states.stateFromEvent(event)
             if state:
                 self._activeState = state(event, self._camera, self.width(), self.height())
-                event.accept()
-        QtWidgets.QOpenGLWidget.mousePressEvent(self, event)
+        self.setFocus()
 
     def mouseMoveEvent(self, event):
         """ Override to add custom state handling. """
@@ -135,21 +133,15 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
             self._showCurrentMouseUVPosition
         ):
             self.update()
-            event.accept()
-        QtWidgets.QOpenGLWidget.mouseMoveEvent(self, event)
 
     def mouseReleaseEvent(self, event):
         """ Override to add custom state handling. """
         if self._activeState and self._activeState.shouldDisable(event.button()):
             self._activeState = None
-            event.accept()
         QtWidgets.QOpenGLWidget.mouseReleaseEvent(self, event)
 
     def wheelEvent(self, event):
         """ Override to add custom GL zoom. """
-        QtWidgets.QOpenGLWidget.wheelEvent(self, event)
-
-        # Perform graph zoom on mouse cursor position
         if not self._activeState:
             pos = event.pos()
             glCoords = self._camera.mapScreenToGl([pos.x(), pos.y()])
@@ -158,6 +150,7 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
             zoomAmount = 1 + (delta and delta // abs(delta)) * 0.03
             self._camera.zoom(worldCoords, zoomAmount)
             self.update()
+        self.setFocus()
 
     # GL EVENTS
     def initializeGL(self):
@@ -193,7 +186,7 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
 
         if self._showGrid:
             self._drawText(self._painter)
-        if self._drawMouseUVPosition:
+        if self._showCurrentMouseUVPosition:
             self._drawMouseUVPosition(self._painter)
         self._painter.end()
 
