@@ -1,14 +1,14 @@
 # Copyright 2021 by Daniel Springall.
 # This file is part of UViewSD, and is released under the "MIT License Agreement".
 # Please see the LICENSE file that should have been included as part of this package.
+from uviewsd import shape
+from uviewsd import states
+from uviewsd import camera
+
 from PySide2 import QtWidgets, QtGui, QtCore
 from OpenGL import GL
 
-import shape
-import states
-import camera
 import logging
-
 logger = logging.getLogger(__name__)
 
 

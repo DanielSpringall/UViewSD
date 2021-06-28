@@ -1,13 +1,13 @@
 # Copyright 2021 by Daniel Springall.
 # This file is part of UViewSD, and is released under the "MIT License Agreement".
 # Please see the LICENSE file that should have been included as part of this package.
-import shape
-import uvwidget
-import os
+from uviewsd import shape
+from uviewsd import uvwidget
 
 from PySide2 import QtWidgets, QtCore, QtGui
 from pxr import Usd, UsdGeom
 
+import os
 import logging
 logger = logging.getLogger(__name__)
 
@@ -73,7 +73,7 @@ class UVViewerWindow(QtWidgets.QMainWindow):
         self._gridToggleButton.setToolTip("Enable/disable visibility of the grid lines and numbers from the view.")
 
         self._uvBorderHighlightToggleButton = QtWidgets.QPushButton()
-        self._uvBorderHighlightToggleButton.setIcon(self.style().standardIcon(getattr(QtWidgets.QStyle, "SP_DialogSaveButton")))
+        self._uvBorderHighlightToggleButton.setIcon(QtGui.QIcon(os.path.join(ICON_DIR, "boundary.png")))
         self._uvBorderHighlightToggleButton.setFixedWidth(25)
         self._uvBorderHighlightToggleButton.setToolTip("Enable/disable highlight of uv boundary edges.")
 
@@ -274,12 +274,12 @@ if __name__ == "__main__":
     # primPaths = ["/Root/Geometry/side_table_525/side_table"]
 
     # KITCHEN
-    # stage = Usd.Stage.Open("C:\\Libraries\\USD\\share\\usd\\kitchenSet\\Kitchen_set.usd")
-    # primPaths = ['/Kitchen_set/Props_grp/North_grp/NorthWall_grp/CastIron_1/Geom/pCylinder151']
+    stage = Usd.Stage.Open("C:\\Libraries\\USD\\share\\usd\\kitchenSet\\Kitchen_set.usd")
+    primPaths = ['/Kitchen_set/Props_grp/West_grp/WestWall_grp/FramePictureOval_1/Geom/FramePictureOval']
 
     # TESTS
-    stage = Usd.Stage.Open("C:\\Users\\Daniel\\Projects\\Python\\UViewSD\\tests\\data\\uvborders.usda")
-    primPaths = ['/cube']
+    # stage = Usd.Stage.Open("C:\\Users\\Daniel\\Projects\\Python\\UViewSD\\uviewsd\\tests\\data\\uvborders.usda")
+    # primPaths = ['/cube']
 
     window = UVViewerWindow(stage)
     window.addPrimPaths(primPaths)
