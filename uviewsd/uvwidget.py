@@ -20,11 +20,13 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
         self._painter = None
         self._uvInfoFont = None
         self._gridNumbersFont = None
+        self._backgroundColor = (0.3, 0.3, 0.3, 1.0)
 
         self._activeState = None
         self._backgroundGrid = None
         self._shapes = []
         self._camera = None
+        self._shader = None
 
         self._showGrid = True
         self._showCurrentMouseUVPosition = False
@@ -32,9 +34,6 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
 
         self.setMouseTracking(self._showCurrentMouseUVPosition)
         self.setMinimumSize(400, 400)
-
-        # Make sure we aren't using a shader that was bound during a previous viewer setup.
-        shader.deleteLineShader()
 
     # SHAPE MANAGEMENT
     def addShapes(self, shapes):
@@ -161,6 +160,7 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
         """ Setup GL objects for the view ready for drawing. """
         self._backgroundGrid = shape.Grid()
         self._camera = camera.Camera2D(self.width(), self.height())
+        self._shader = shader.LineShader()
         self._painter = QtGui.QPainter()
 
         self._gridNumbersFont = QtGui.QFont()
@@ -178,14 +178,17 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
         self._painter.begin(self)
 
         self._painter.beginNativePainting()
-        GL.glClearColor(0.3, 0.3, 0.3, 1.0)
+        GL.glClearColor(*self._backgroundColor)
         GL.glClear(GL.GL_COLOR_BUFFER_BIT)
 
         projectionMatrix = self._camera.glProjectionMatrix()
+        self._shader.use()
+        self._shader.setMatrix4f("viewMatrix", projectionMatrix)
+
         if self._showGrid:
-            self._backgroundGrid.draw(projectionMatrix)
+            self._backgroundGrid.draw(self._shader)
         for _shape in self._shapes:
-            _shape.draw(projectionMatrix, drawBoundaries=self._showUVEdgeBoundaryHighlight)
+            _shape.draw(self._shader, drawBoundaries=self._showUVEdgeBoundaryHighlight)
         self._painter.endNativePainting()
 
         if self._showGrid:

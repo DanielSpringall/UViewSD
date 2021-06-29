@@ -1,8 +1,6 @@
 # Copyright 2021 by Daniel Springall.
 # This file is part of UViewSD, and is released under the "MIT License Agreement".
 # Please see the LICENSE file that should have been included as part of this package.
-from uviewsd import shader
-
 from ctypes import c_void_p
 from OpenGL import GL
 from pxr import UsdGeom
@@ -201,9 +199,8 @@ class UVShape:
         self._numBoundaryUVs = None
 
         self._color = (1.0, 1.0, 1.0)
-        self._bao = None
         self._vao = None
-        self._shader = None
+        self._bao = None
         self._bbox = None
 
     def identifier(self):
@@ -230,8 +227,6 @@ class UVShape:
         return self._bbox
 
     def initializeGLData(self):
-        self._shader = shader.getLineShader()
-
         self._vao = GL.glGenVertexArrays(1)
         [pbo, ebo] = GL.glGenBuffers(2)
 
@@ -270,20 +265,19 @@ class UVShape:
         GL.glBindBuffer(GL.GL_ARRAY_BUFFER, 0)
         GL.glBindVertexArray(0)
 
-    def draw(self, projectionMatrix, drawBoundaries=False):
+    def draw(self, shader, drawBoundaries=False, **kwargs):
         """ OpenGl draw call.
 
         Args:
-            projectionMatrix (float[16]): The projection matrix to pass the shader.
+            shader (uviewsd.shader): The shader to use for the draw call. Assumed to already be set as in use.
+            drawBoundaries (bool): If true, draw the uv edge boundary highlights.
         """
         if not self._vao:
             self.initializeGLData()
         if drawBoundaries and not self._bao:
             self.initializeBoundaryGLData()
 
-        self._shader.use()
-        self._shader.setMatrix4f("viewMatrix", projectionMatrix)
-        self._shader.setVec3f("color", self._color)
+        shader.setVec3f("color", self._color)
 
         GL.glLineWidth(1.0)
         GL.glBindVertexArray(self._vao)
@@ -304,8 +298,6 @@ class Grid:
 
     def __init__(self):
         """ OpenGL class for drawing all the lines that make up the background grid for the uv viewer. """
-        self._shader = shader.getLineShader()
-
         incrementalLines = []
         unitLines = []
         originLines = []
@@ -375,15 +367,12 @@ class Grid:
         }
         return data
 
-    def draw(self, projectionMatrix):
+    def draw(self, shader, **kwargs):
         """ OpenGl draw call.
 
         Args:
-            projectionMatrix (float[16]): The projection matrix to pass the shader.
+            shader (uviewsd.shader): The shader to use for the draw call. Assumed to already be set as in use.
         """
-        self._shader.use()
-        self._shader.setMatrix4f("viewMatrix", projectionMatrix)
-
         GL.glLineWidth(1.0)
 
         previousColor = None
@@ -391,7 +380,7 @@ class Grid:
             # Set color
             color = data["color"]
             if color != previousColor:
-                self._shader.setVec3f("color", color)
+                shader.setVec3f("color", color)
                 previousColor = color
 
             # Draw
