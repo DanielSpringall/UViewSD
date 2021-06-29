@@ -5,7 +5,6 @@ from uviewsd import shape
 from uviewsd import uvwidget
 
 from PySide2 import QtWidgets, QtCore
-from pxr import Usd, UsdGeom
 
 import os
 import logging
@@ -202,11 +201,10 @@ class UVViewerWindow(QtWidgets.QMainWindow):
                 if prim == extractor.prim():
                     break
             else:
-                mesh = UsdGeom.Mesh(prim)
-                if not shape.UVExtractor.validMesh(mesh):
+                extractor = shape.UVExtractor(prim)
+                if not extractor.isValid():
                     logger.info("Invalid prim %s to extract uv data from.", prim)
                     continue
-                extractor = shape.UVExtractor(mesh)
                 for uvName in extractor.validUVNames():
                     if uvName not in self._availableUVSetNames:
                         newUVNames = True
@@ -293,34 +291,3 @@ class UVViewerWindow(QtWidgets.QMainWindow):
         self._uvSetNameComboBox.blockSignals(True)
         self._uvSetNameComboBox.clear()
         self._uvSetNameComboBox.blockSignals(False)
-
-
-if __name__ == "__main__":
-    logger.setLevel(logging.DEBUG)
-    QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_UseDesktopOpenGL)
-    app = QtWidgets.QApplication([])
-
-    stage = None
-    primPaths = []
-
-    # ATTIC
-    # stage = Usd.Stage.Open("C:\\Libraries\\USD\\share\\usd\\Attic_NVIDIA\\Attic_NVIDIA.usd")
-    # primPaths = ["/Root/Geometry/side_table_525/side_table"]
-
-    # KITCHEN
-    stage = Usd.Stage.Open(
-        "C:\\Libraries\\USD\\share\\usd\\kitchenSet\\Kitchen_set.usd"
-    )
-    primPaths = [
-        "/Kitchen_set/Props_grp/West_grp/WestWall_grp/FramePictureOval_1/Geom/FramePictureOval"
-    ]
-
-    # TESTS
-    # stage = Usd.Stage.Open("C:\\Users\\Daniel\\Projects\\Python\\UViewSD\\uviewsd\\tests\\data\\uvborders.usda")
-    # primPaths = ['/cube']
-
-    window = UVViewerWindow(stage)
-    window.addPrimPaths(primPaths)
-    window.show()
-
-    app.exec_()

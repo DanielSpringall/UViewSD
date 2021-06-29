@@ -13,51 +13,38 @@ logger = logging.getLogger(__name__)
 
 # USD
 class UVExtractor:
-    def __init__(self, mesh):
+    VALID_PRIMVAR_TYPE_NAME = ["texCoord2f[]", "float2[]"]
+
+    def __init__(self, prim):
         """Helper class for extracting uv data from a USDGeom mesh."""
-        self._mesh = mesh
+        self._mesh = UsdGeom.Mesh(prim)
         self._validUVNames = None
 
     def prim(self):
         return self._mesh.GetPrim()
 
-    @staticmethod
-    def validMesh(mesh):
+    def isValid(self):
         """Test a given USDGeom mesh has the relveant data to extract uv's from.
 
         Returns:
             bool: True if the mesh has the relevant data to extract uv's for. False otherwise.
         """
-        if not mesh:
-            logger.debug("Invalid mesh for uv data. %s.", mesh)
+        if not self._mesh:
+            logger.debug("Invalid mesh for uv data. %s.", self._mesh)
             return False
-        if not mesh.GetFaceVertexCountsAttr():
+        if not self._mesh.GetFaceVertexCountsAttr():
             logger.debug(
                 "Invalid mesh for uv data. %s. Missing face vertex count attribute.",
-                mesh,
+                self._mesh,
             )
             return False
-        if not mesh.GetFaceVertexIndicesAttr():
+        if not self._mesh.GetFaceVertexIndicesAttr():
             logger.debug(
                 "Invalid mesh for uv data. %s. Missing face vertex indices attribute.",
-                mesh,
+                self._mesh,
             )
             return False
         return True
-
-    @staticmethod
-    def _getValidUVNames(mesh):
-        """Return a list of all the uv names from the prim vars on the mesh.
-
-        Returns:
-            list[str]: List of valid uv names.
-        """
-        validUVNames = []
-        for primvar in mesh.GetPrimvars():
-            if primvar.GetTypeName() not in ["texCoord2f[]", "float2[]"]:
-                continue
-            validUVNames.append(primvar.GetPrimvarName())
-        return validUVNames
 
     def validUVNames(self):
         """Get a list of uv names that are valid on the mesh.
@@ -66,7 +53,11 @@ class UVExtractor:
             list[str]: List of valid uv names.
         """
         if self._validUVNames is None:
-            self._validUVNames = self._getValidUVNames(self._mesh)
+            self._validUVNames = []
+            for primvar in self._mesh.GetPrimvars():
+                if primvar.GetTypeName() not in self.VALID_PRIMVAR_TYPE_NAME:
+                    continue
+                self._validUVNames.append(primvar.GetPrimvarName())
         return self._validUVNames
 
     def isUVNameValid(self, uvName):
