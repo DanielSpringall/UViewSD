@@ -4,7 +4,7 @@
 from uviewsd import shape
 from uviewsd import uvwidget
 
-from PySide2 import QtWidgets, QtCore, QtGui
+from PySide2 import QtWidgets, QtCore
 from pxr import Usd, UsdGeom
 
 import os
@@ -29,7 +29,7 @@ class UVViewerWindow(QtWidgets.QMainWindow):
         self._view = None
         self._gridToggleButton = None
         self._uvBorderHighlightToggleButton = None
-        self._uvDataLabelButton = None
+        self._uvDataLabelToggleButton = None
         self._uvSetNameComboBox = None
         self._uvNameLockCheckBox = None
 
@@ -60,39 +60,40 @@ class UVViewerWindow(QtWidgets.QMainWindow):
 
         uvOptionsLabel = QtWidgets.QLabel()
         uvOptionsLabel.setText("UV Set:")
-        uvOptionsLabel.setFixedWidth(40)
+        uvOptionsLabel.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
         self._uvSetNameComboBox = QtWidgets.QComboBox()
         self._uvSetNameComboBox.setToolTip(
             "UV set name extracted from the selected USD prims."
         )
         self._uvSetNameComboBox.setMinimumWidth(200)
+        self._uvSetNameComboBox.setSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
+        )
 
         spacerLine = QtWidgets.QFrame()
         spacerLine.setFrameShape(QtWidgets.QFrame.VLine)
         spacerLine.setFrameShadow(QtWidgets.QFrame.Sunken)
 
-        self._gridToggleButton = QtWidgets.QPushButton()
-        self._gridToggleButton.setIcon(QtGui.QIcon(os.path.join(ICON_DIR, "grid.png")))
-        self._gridToggleButton.setFixedWidth(25)
-        self._gridToggleButton.setToolTip(
-            "Enable/disable visibility of the grid lines and numbers from the view."
+        self._uvBorderHighlightToggleButton = QtWidgets.QCheckBox()
+        self._uvBorderHighlightToggleButton.setText("UV Border")
+        self._uvBorderHighlightToggleButton.setChecked(
+            self._view._showUVEdgeBoundaryHighlight
         )
-
-        self._uvBorderHighlightToggleButton = QtWidgets.QPushButton()
-        self._uvBorderHighlightToggleButton.setIcon(
-            QtGui.QIcon(os.path.join(ICON_DIR, "boundary.png"))
-        )
-        self._uvBorderHighlightToggleButton.setFixedWidth(25)
         self._uvBorderHighlightToggleButton.setToolTip(
             "Enable/disable highlight of uv boundary edges."
         )
 
-        self._uvDataLabelButton = QtWidgets.QPushButton()
-        self._uvDataLabelButton.setIcon(
-            QtGui.QIcon(os.path.join(ICON_DIR, "uvdata.png"))
+        self._gridToggleButton = QtWidgets.QCheckBox()
+        self._gridToggleButton.setText("Grid")
+        self._gridToggleButton.setChecked(self._view._showGrid)
+        self._gridToggleButton.setToolTip(
+            "Enable/disable visibility of the grid lines and numbers from the view."
         )
-        self._uvDataLabelButton.setFixedWidth(25)
-        self._uvDataLabelButton.setToolTip(
+
+        self._uvDataLabelToggleButton = QtWidgets.QCheckBox()
+        self._uvDataLabelToggleButton.setText("UV Pos")
+        self._uvDataLabelToggleButton.setChecked(self._view._showCurrentMouseUVPosition)
+        self._uvDataLabelToggleButton.setToolTip(
             "Enable/disable display of mouse uv position."
         )
 
@@ -103,15 +104,23 @@ class UVViewerWindow(QtWidgets.QMainWindow):
         layout.addSpacing(3)
         layout.addWidget(self._uvBorderHighlightToggleButton)
         layout.addWidget(self._gridToggleButton)
-        layout.addWidget(self._uvDataLabelButton)
+        layout.addWidget(self._uvDataLabelToggleButton)
         return layout
 
     def _setupConnections(self):
-        self._gridToggleButton.clicked.connect(self._view.toggleGridVisibility)
-        self._uvBorderHighlightToggleButton.clicked.connect(
-            self._view.toggleUVEdgeBoundaryHighlight
+        self._gridToggleButton.clicked.connect(
+            lambda: self._view.setGridVisibility(self._gridToggleButton.isChecked())
         )
-        self._uvDataLabelButton.clicked.connect(self._view.toggleMouseUVPositionDisplay)
+        self._uvBorderHighlightToggleButton.clicked.connect(
+            lambda: self._view.setUVEdgeBoundaryHighlight(
+                self._uvBorderHighlightToggleButton.isChecked()
+            )
+        )
+        self._uvDataLabelToggleButton.clicked.connect(
+            lambda: self._view.setMouseUVPositionDisplay(
+                self._uvDataLabelToggleButton.isChecked()
+            )
+        )
         self._uvSetNameComboBox.currentIndexChanged.connect(self.refreshUVViewer)
 
     def keyPressEvent(self, event):

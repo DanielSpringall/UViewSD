@@ -86,21 +86,27 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
         self.update()
 
     # VIEW ACTIONS
-    def toggleGridVisibility(self):
-        """Toggle the visible state of the grid lines and numbers in the view."""
-        self._showGrid = not self._showGrid
-        self.update()
+    def setGridVisibility(self, visible):
+        """Set the visible state of the grid lines and numbers in the view."""
+        visible = bool(visible)
+        if self._showGrid != visible:
+            self._showGrid = visible
+            self.update()
 
-    def toggleMouseUVPositionDisplay(self):
-        """Toggle the display of the uv position at the current mouse position in the bottom left of the widget."""
-        self._showCurrentMouseUVPosition = not self._showCurrentMouseUVPosition
-        self.setMouseTracking(self._showCurrentMouseUVPosition)
-        self.update()
+    def setMouseUVPositionDisplay(self, visible):
+        """Set the visible state of the uv position at the current mouse position in the bottom left of the widget."""
+        visible = bool(visible)
+        if self._showCurrentMouseUVPosition != visible:
+            self._showCurrentMouseUVPosition = visible
+            self.setMouseTracking(visible)
+            self.update()
 
-    def toggleUVEdgeBoundaryHighlight(self):
-        """Toggle the display of uv edge boundary highlights."""
-        self._showUVEdgeBoundaryHighlight = not self._showUVEdgeBoundaryHighlight
-        self.update()
+    def setUVEdgeBoundaryHighlight(self, visible):
+        """Set the display of uv edge boundary highlights."""
+        visible = bool(visible)
+        if self._showUVEdgeBoundaryHighlight != visible:
+            self._showUVEdgeBoundaryHighlight = visible
+            self.update()
 
     def focusOnBBox(self):
         """Focus the viewer on the bbox surounding all the currently displayed shapes."""
