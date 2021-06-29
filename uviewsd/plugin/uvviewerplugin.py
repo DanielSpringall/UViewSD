@@ -9,9 +9,8 @@ class UVViewerPluginContainer(PluginContainer):
     def registerPlugins(self, plugRegistry, usdviewApi):
         self._windowModule = self.deferredImport("uviewsd.plugin.window")
         self._openWindow = plugRegistry.registerCommandPlugin(
-            "UVViewerPluginContainer.launchWindow",
-            "Viewer",
-            self.launchWindow)
+            "UVViewerPluginContainer.launchWindow", "Viewer", self.launchWindow
+        )
 
     def configureView(self, plugRegistry, plugUIBuilder):
         uvMenu = plugUIBuilder.findOrCreateMenu("UV")

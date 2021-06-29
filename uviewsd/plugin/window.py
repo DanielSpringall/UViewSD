@@ -18,7 +18,9 @@ class USDViewerUVWindow(window.UVViewerWindow):
 
     def _setupConnections(self):
         window.UVViewerWindow._setupConnections(self)
-        self._usdviewApi.dataModel.selection.signalPrimSelectionChanged.connect(self.selectionChanged)
+        self._usdviewApi.dataModel.selection.signalPrimSelectionChanged.connect(
+            self.selectionChanged
+        )
 
     def selectionChanged(self, *args, **kwargs):
         selectedPaths = self._usdviewApi.selectedPaths

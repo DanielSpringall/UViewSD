@@ -58,7 +58,9 @@ class LineShader:
         GL.glUniform3fv(GL.glGetUniformLocation(self.programId, name), 1, value)
 
     def setMatrix4f(self, name, value):
-        GL.glUniformMatrix4fv(GL.glGetUniformLocation(self.programId, name), 1, GL.GL_FALSE, value)
+        GL.glUniformMatrix4fv(
+            GL.glGetUniformLocation(self.programId, name), 1, GL.GL_FALSE, value
+        )
 
     def use(self):
         GL.glUseProgram(self.programId)
@@ -70,8 +72,14 @@ class LineShader:
         if getivMethod(shader, statusToCheck):
             return
 
-        getInfoMethod = GL.glGetProgramInfoLog if isProgramShader else GL.glGetShaderInfoLog
+        getInfoMethod = (
+            GL.glGetProgramInfoLog if isProgramShader else GL.glGetShaderInfoLog
+        )
         info = getInfoMethod(shader)
         if info:
-            failType = "shader linking" if isProgramShader else "{} shader compilation".format(shaderName)
+            failType = (
+                "shader linking"
+                if isProgramShader
+                else "{} shader compilation".format(shaderName)
+            )
             raise RuntimeError("Failed {}: {}".format(failType, info))

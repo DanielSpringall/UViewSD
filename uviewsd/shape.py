@@ -7,13 +7,14 @@ from pxr import UsdGeom
 import numpy as np
 
 import logging
+
 logger = logging.getLogger(__name__)
 
 
 # USD
 class UVExtractor:
     def __init__(self, mesh):
-        """ Helper class for extracting uv data from a USDGeom mesh. """
+        """Helper class for extracting uv data from a USDGeom mesh."""
         self._mesh = mesh
         self._validUVNames = None
 
@@ -22,8 +23,8 @@ class UVExtractor:
 
     @staticmethod
     def validMesh(mesh):
-        """ Test a given USDGeom mesh has the relveant data to extract uv's from.
-        
+        """Test a given USDGeom mesh has the relveant data to extract uv's from.
+
         Returns:
             bool: True if the mesh has the relevant data to extract uv's for. False otherwise.
         """
@@ -31,17 +32,23 @@ class UVExtractor:
             logger.debug("Invalid mesh for uv data. %s.", mesh)
             return False
         if not mesh.GetFaceVertexCountsAttr():
-            logger.debug("Invalid mesh for uv data. %s. Missing face vertex count attribute.", mesh)
+            logger.debug(
+                "Invalid mesh for uv data. %s. Missing face vertex count attribute.",
+                mesh,
+            )
             return False
         if not mesh.GetFaceVertexIndicesAttr():
-            logger.debug("Invalid mesh for uv data. %s. Missing face vertex indices attribute.", mesh)
+            logger.debug(
+                "Invalid mesh for uv data. %s. Missing face vertex indices attribute.",
+                mesh,
+            )
             return False
         return True
 
     @staticmethod
     def _getValidUVNames(mesh):
-        """ Return a list of all the uv names from the prim vars on the mesh.
-        
+        """Return a list of all the uv names from the prim vars on the mesh.
+
         Returns:
             list[str]: List of valid uv names.
         """
@@ -53,8 +60,8 @@ class UVExtractor:
         return validUVNames
 
     def validUVNames(self):
-        """ Get a list of uv names that are valid on the mesh.
-        
+        """Get a list of uv names that are valid on the mesh.
+
         Returns:
             list[str]: List of valid uv names.
         """
@@ -66,8 +73,8 @@ class UVExtractor:
         return uvName in self.validUVNames()
 
     def uvData(self, uvName):
-        """ Extract the uv data of a specific name from the mesh.
-        
+        """Extract the uv data of a specific name from the mesh.
+
         Args:
             uvName (str): The name of the uv prim to get the data for.
         Returns:
@@ -76,7 +83,12 @@ class UVExtractor:
                 where each index maps back to the uv positions. So uvPos0 -> uvPos1 would make up an edge.
         """
         if not self.isUVNameValid(uvName):
-            logger.debug("%s not a valid uv name for %s. Valid names: %s.", uvName, self._mesh, self.validUVNames())
+            logger.debug(
+                "%s not a valid uv name for %s. Valid names: %s.",
+                uvName,
+                self._mesh,
+                self.validUVNames(),
+            )
             return None, None
 
         primvar = self._mesh.GetPrimvar(uvName)
@@ -90,7 +102,7 @@ class UVExtractor:
         return None, None
 
     def _getFaceVaryingUVs(self, primvar):
-        """ Extract the face varying uv data from a primvar.
+        """Extract the face varying uv data from a primvar.
 
         Args:
             primvar (Usd.Primvar): The primvar to extract the uv data from.
@@ -106,7 +118,7 @@ class UVExtractor:
         return [uvPositions, edgeIndices]
 
     def _getVertexVaryingUVs(self, primvar):
-        """ Extract the vertex varying uv data from a primvar.
+        """Extract the vertex varying uv data from a primvar.
 
         Args:
             primvar (Usd.Primvar): The primvar to extract the uv data from.
@@ -127,7 +139,7 @@ class UVExtractor:
 
     @staticmethod
     def _createUVEdges(faceVertCountList, indexMaps):
-        """ Generate the uv edge indices from a given list of uv indices.
+        """Generate the uv edge indices from a given list of uv indices.
 
         Args:
             faceVertCountList list[int]:
@@ -144,7 +156,9 @@ class UVExtractor:
         for faceVertCount in faceVertCountList:
             for i in range(faceVertCount):
                 firstIndex = consumedIndices + i
-                secondIndex = consumedIndices if i  == (faceVertCount - 1) else firstIndex + 1
+                secondIndex = (
+                    consumedIndices if i == (faceVertCount - 1) else firstIndex + 1
+                )
                 for indexMap in indexMaps:
                     firstIndex = indexMap[firstIndex]
                     secondIndex = indexMap[secondIndex]
@@ -154,7 +168,7 @@ class UVExtractor:
 
     @staticmethod
     def edgeBoundariesFromEdgeIndices(uvIndices):
-        """ Get the indices that make up the uv boundary edges.
+        """Get the indices that make up the uv boundary edges.
 
         Args:
             uvIndices list[tuple(int, int)]:
@@ -182,7 +196,7 @@ class UVExtractor:
 # OPENGL
 class UVShape:
     def __init__(self, positions, indices, identifier):
-        """ OpenGl class for drawing uv edges.
+        """OpenGl class for drawing uv edges.
 
         Args:
             positions (list[float]):
@@ -207,7 +221,7 @@ class UVShape:
         return self._identifier
 
     def bbox(self):
-        """ Calculate the bounding box from the uv positions.
+        """Calculate the bounding box from the uv positions.
 
         Returns:
             BBox: The bbox surounding the uv positions.
@@ -233,10 +247,20 @@ class UVShape:
         GL.glBindVertexArray(self._vao)
         # Positions
         GL.glBindBuffer(GL.GL_ARRAY_BUFFER, pbo)
-        GL.glBufferData(GL.GL_ARRAY_BUFFER, self._positions.nbytes, self._positions, GL.GL_STATIC_DRAW)
+        GL.glBufferData(
+            GL.GL_ARRAY_BUFFER,
+            self._positions.nbytes,
+            self._positions,
+            GL.GL_STATIC_DRAW,
+        )
         # Indices
         GL.glBindBuffer(GL.GL_ELEMENT_ARRAY_BUFFER, ebo)
-        GL.glBufferData(GL.GL_ELEMENT_ARRAY_BUFFER, self._indices.nbytes, self._indices.flatten(), GL.GL_STATIC_DRAW)
+        GL.glBufferData(
+            GL.GL_ELEMENT_ARRAY_BUFFER,
+            self._indices.nbytes,
+            self._indices.flatten(),
+            GL.GL_STATIC_DRAW,
+        )
 
         GL.glVertexAttribPointer(0, 2, GL.GL_FLOAT, GL.GL_FALSE, 0, c_void_p(0))
         GL.glEnableVertexAttribArray(0)
@@ -245,7 +269,9 @@ class UVShape:
         GL.glBindVertexArray(0)
 
     def initializeBoundaryGLData(self):
-        self._boundaryIndices = np.array(UVExtractor.edgeBoundariesFromEdgeIndices(self._indices), dtype=np.int)
+        self._boundaryIndices = np.array(
+            UVExtractor.edgeBoundariesFromEdgeIndices(self._indices), dtype=np.int
+        )
         self._numBoundaryUVs = self._boundaryIndices.flatten().size
 
         self._bao = GL.glGenVertexArrays(1)
@@ -254,10 +280,20 @@ class UVShape:
         GL.glBindVertexArray(self._bao)
         # Positions
         GL.glBindBuffer(GL.GL_ARRAY_BUFFER, pbo)
-        GL.glBufferData(GL.GL_ARRAY_BUFFER, self._positions.nbytes, self._positions, GL.GL_STATIC_DRAW)
+        GL.glBufferData(
+            GL.GL_ARRAY_BUFFER,
+            self._positions.nbytes,
+            self._positions,
+            GL.GL_STATIC_DRAW,
+        )
         # Indices
         GL.glBindBuffer(GL.GL_ELEMENT_ARRAY_BUFFER, ebo)
-        GL.glBufferData(GL.GL_ELEMENT_ARRAY_BUFFER, self._boundaryIndices.nbytes, self._boundaryIndices.flatten(), GL.GL_STATIC_DRAW)
+        GL.glBufferData(
+            GL.GL_ELEMENT_ARRAY_BUFFER,
+            self._boundaryIndices.nbytes,
+            self._boundaryIndices.flatten(),
+            GL.GL_STATIC_DRAW,
+        )
 
         GL.glVertexAttribPointer(0, 2, GL.GL_FLOAT, GL.GL_FALSE, 0, c_void_p(0))
         GL.glEnableVertexAttribArray(0)
@@ -266,7 +302,7 @@ class UVShape:
         GL.glBindVertexArray(0)
 
     def draw(self, shader, drawBoundaries=False, **kwargs):
-        """ OpenGl draw call.
+        """OpenGl draw call.
 
         Args:
             shader (uviewsd.shader): The shader to use for the draw call. Assumed to already be set as in use.
@@ -286,18 +322,20 @@ class UVShape:
         if drawBoundaries:
             GL.glLineWidth(3.0)
             GL.glBindVertexArray(self._bao)
-            GL.glDrawElements(GL.GL_LINES, self._numBoundaryUVs, GL.GL_UNSIGNED_INT, None)
+            GL.glDrawElements(
+                GL.GL_LINES, self._numBoundaryUVs, GL.GL_UNSIGNED_INT, None
+            )
 
         GL.glBindVertexArray(0)
 
 
 class Grid:
     NUM_GRIDS_FROM_ORIGIN = 5
-    LINE_INTERVALS = 10 # Small line every 0.1 units
+    LINE_INTERVALS = 10  # Small line every 0.1 units
     TOTAL_LINES = NUM_GRIDS_FROM_ORIGIN * LINE_INTERVALS
 
     def __init__(self):
-        """ OpenGL class for drawing all the lines that make up the background grid for the uv viewer. """
+        """OpenGL class for drawing all the lines that make up the background grid for the uv viewer."""
         incrementalLines = []
         unitLines = []
         originLines = []
@@ -308,10 +346,14 @@ class Grid:
             offset = i / self.LINE_INTERVALS
             lineOffset = minVal + offset
             lineVerts = [
-                minVal, lineOffset, # x start
-                maxVal, lineOffset, # x end
-                lineOffset, minVal, # y start
-                lineOffset, maxVal, # y end
+                minVal,
+                lineOffset,  # x start
+                maxVal,
+                lineOffset,  # x end
+                lineOffset,
+                minVal,  # y start
+                lineOffset,
+                maxVal,  # y end
             ]
             if lineOffset == 0:
                 originLines.extend(lineVerts)
@@ -329,15 +371,21 @@ class Grid:
         uColor = (1.0, 0.0, 0.0)
         vColor = (1.0, 1.0, 0.0)
         self._lineData = [
-            self.initializeGLData(np.array(incrementalLines, dtype=np.float32), color=incrementalColor),
-            self.initializeGLData(np.array(unitLines, dtype=np.float32), color=baseColor),
-            self.initializeGLData(np.array(originLines, dtype=np.float32), color=originColor),
+            self.initializeGLData(
+                np.array(incrementalLines, dtype=np.float32), color=incrementalColor
+            ),
+            self.initializeGLData(
+                np.array(unitLines, dtype=np.float32), color=baseColor
+            ),
+            self.initializeGLData(
+                np.array(originLines, dtype=np.float32), color=originColor
+            ),
             self.initializeGLData(np.array(uLine, dtype=np.float32), color=uColor),
             self.initializeGLData(np.array(vLine, dtype=np.float32), color=vColor),
         ]
 
     def initializeGLData(self, lineData, color):
-        """ Initialize the OpenGL data for a given set of line data.
+        """Initialize the OpenGL data for a given set of line data.
 
         Args:
             lineData (np.array): Array of vertex positions for lines.
@@ -355,20 +403,18 @@ class Grid:
         GL.glEnableVertexAttribArray(0)
         GL.glVertexAttribPointer(0, 2, GL.GL_FLOAT, GL.GL_FALSE, 0, c_void_p(0))
 
-        GL.glBufferData(GL.GL_ARRAY_BUFFER, lineData.nbytes, lineData, GL.GL_STATIC_DRAW)
+        GL.glBufferData(
+            GL.GL_ARRAY_BUFFER, lineData.nbytes, lineData, GL.GL_STATIC_DRAW
+        )
 
         GL.glBindBuffer(GL.GL_ARRAY_BUFFER, 0)
         GL.glBindVertexArray(0)
 
-        data = {
-            "vao": vao,
-            "numVerts": int(len(lineData) / 2),
-            "color": color
-        }
+        data = {"vao": vao, "numVerts": int(len(lineData) / 2), "color": color}
         return data
 
     def draw(self, shader, **kwargs):
-        """ OpenGl draw call.
+        """OpenGl draw call.
 
         Args:
             shader (uviewsd.shader): The shader to use for the draw call. Assumed to already be set as in use.
@@ -435,8 +481,8 @@ class Edge:
     def __hash__(self):
         return hash((self.startIndex, self.endIndex))
 
-    def __eq__(self, otherEdge): 
+    def __eq__(self, otherEdge):
         return (
-            self.startIndex == otherEdge.startIndex and
-            self.endIndex == otherEdge.endIndex
+            self.startIndex == otherEdge.startIndex
+            and self.endIndex == otherEdge.endIndex
         )

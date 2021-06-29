@@ -20,7 +20,7 @@ class BaseState:
         self._initYScale = self._initProjMat[1][1]
 
     def _glScreenCoord(self, event):
-        """ Get the GL screen co-ordinates from a Qt event.
+        """Get the GL screen co-ordinates from a Qt event.
 
         Args:
             event (QtCore.QEvent): The event to get the co-ordinates from.
@@ -32,7 +32,7 @@ class BaseState:
 
     @classmethod
     def canEnable(cls, modifiers, button):
-        """ Test if this event should be enabled based on a class defined list of pressed button and modifiers.
+        """Test if this event should be enabled based on a class defined list of pressed button and modifiers.
 
         Args:
             modifiers (Qt.KeyboardModifiers): The list of keyboard modifiers to test.
@@ -41,7 +41,9 @@ class BaseState:
             bool: True if modifiers/button match the enable state requirements. False otherwise.
         """
         if cls.EVENT_BUTTON is None:
-            raise RuntimeError("No button specified to test if {} can be enabled.".format(cls.__name__))
+            raise RuntimeError(
+                "No button specified to test if {} can be enabled.".format(cls.__name__)
+            )
         if button != cls.EVENT_BUTTON:
             return False
         if cls.EVENT_MODIFIERS is not None and cls.EVENT_MODIFIERS != modifiers:
@@ -50,22 +52,26 @@ class BaseState:
 
     @classmethod
     def shouldDisable(cls, button):
-        """ Test if this event should be disabled based on a class defined button.
+        """Test if this event should be disabled based on a class defined button.
 
         Args:
             button (Qt.MouseButton): The buttont to test.
         Return
             bool: True if button matches the disable state requirements. False otherwise.
         """
-        # Note: We want the UX behaviour of being able to start the event with modifiers + button, 
+        # Note: We want the UX behaviour of being able to start the event with modifiers + button,
         # but then release the modifier whilst moving the mouse. So we only need to do a button
         # comparison here.
         if cls.EVENT_BUTTON is None:
-            raise RuntimeError("No button specified to test if {} should be disabled.".format(cls.__name__))
+            raise RuntimeError(
+                "No button specified to test if {} should be disabled.".format(
+                    cls.__name__
+                )
+            )
         return button == cls.EVENT_BUTTON
 
     def update(self, event):
-        """ Trigger and update of the state.
+        """Trigger and update of the state.
 
         Args:
             event (QtCore.QEvent): The event to update from.
@@ -76,7 +82,8 @@ class BaseState:
 
 
 class ZoomState(BaseState):
-    """ Mouse drag zoom in/out. """
+    """Mouse drag zoom in/out."""
+
     EVENT_BUTTON = QtCore.Qt.RightButton
     EVENT_MODIFIERS = QtCore.Qt.AltModifier
 
@@ -93,14 +100,15 @@ class ZoomState(BaseState):
             matrix=self._initProjMat,
             xScale=zoomAmount,
             yScale=zoomAmount,
-            coord=self._initWorldCoord
+            coord=self._initWorldCoord,
         )
         self._camera.setProjectionMatrix(zoomedProjectionMatrix)
         return True
 
 
 class PanState(BaseState):
-    """ Mouse drag pan state. """
+    """Mouse drag pan state."""
+
     EVENT_BUTTON = QtCore.Qt.MiddleButton
     EVENT_MODIFIERS = QtCore.Qt.AltModifier
 
@@ -118,7 +126,7 @@ AVAILABLE_STATES = [PanState, ZoomState]
 
 
 def stateFromEvent(event):
-    """ Test for a valid state from a given event and it's triggers. 
+    """Test for a valid state from a given event and it's triggers.
 
     Args:
         event (QtCore.QEvent): The event to test from.

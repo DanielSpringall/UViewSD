@@ -10,6 +10,7 @@ from PySide2 import QtWidgets, QtGui, QtCore
 from OpenGL import GL
 
 import logging
+
 logger = logging.getLogger(__name__)
 
 
@@ -37,7 +38,7 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
 
     # SHAPE MANAGEMENT
     def addShapes(self, shapes):
-        """ Add a list of shapes to be drawn in the scene and refresh the view.
+        """Add a list of shapes to be drawn in the scene and refresh the view.
         Existing shapes with the same name will be overridden.
 
         Args:
@@ -52,8 +53,8 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
         self.update()
 
     def removeShapes(self, shapeNames, update=True):
-        """ CLear a list of shapes from the view
-        
+        """CLear a list of shapes from the view
+
         Args:
             shapeNames (list[str]): Names of the shapes to remove from the view.
             update (bool): If true, trigger a UI update if any shapes have been removed.
@@ -78,7 +79,7 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
             self.update()
 
     def clear(self):
-        """ Clear all the shapes drawn in the view. """
+        """Clear all the shapes drawn in the view."""
         if not self._shapes:
             return
         self._shapes = []
@@ -86,23 +87,23 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
 
     # VIEW ACTIONS
     def toggleGridVisibility(self):
-        """ Toggle the visible state of the grid lines and numbers in the view. """
+        """Toggle the visible state of the grid lines and numbers in the view."""
         self._showGrid = not self._showGrid
         self.update()
 
     def toggleMouseUVPositionDisplay(self):
-        """ Toggle the display of the uv position at the current mouse position in the bottom left of the widget. """
+        """Toggle the display of the uv position at the current mouse position in the bottom left of the widget."""
         self._showCurrentMouseUVPosition = not self._showCurrentMouseUVPosition
         self.setMouseTracking(self._showCurrentMouseUVPosition)
         self.update()
 
     def toggleUVEdgeBoundaryHighlight(self):
-        """ Toggle the display of uv edge boundary highlights. """
+        """Toggle the display of uv edge boundary highlights."""
         self._showUVEdgeBoundaryHighlight = not self._showUVEdgeBoundaryHighlight
         self.update()
 
     def focusOnBBox(self):
-        """ Focus the viewer on the bbox surounding all the currently displayed shapes. """
+        """Focus the viewer on the bbox surounding all the currently displayed shapes."""
         if not self._shapes:
             self._camera.focus(0, 1, 1, 0)
         else:
@@ -122,29 +123,30 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
         QtWidgets.QOpenGLWidget.keyPressEvent(self, event)
 
     def mousePressEvent(self, event):
-        """ Override to add custom state handling. """
+        """Override to add custom state handling."""
         if not self._activeState:
             state = states.stateFromEvent(event)
             if state:
-                self._activeState = state(event, self._camera, self.width(), self.height())
+                self._activeState = state(
+                    event, self._camera, self.width(), self.height()
+                )
         self.setFocus()
 
     def mouseMoveEvent(self, event):
-        """ Override to add custom state handling. """
+        """Override to add custom state handling."""
         if (
-            (self._activeState and self._activeState.update(event)) or
-            self._showCurrentMouseUVPosition
-        ):
+            self._activeState and self._activeState.update(event)
+        ) or self._showCurrentMouseUVPosition:
             self.update()
 
     def mouseReleaseEvent(self, event):
-        """ Override to add custom state handling. """
+        """Override to add custom state handling."""
         if self._activeState and self._activeState.shouldDisable(event.button()):
             self._activeState = None
         QtWidgets.QOpenGLWidget.mouseReleaseEvent(self, event)
 
     def wheelEvent(self, event):
-        """ Override to add custom GL zoom. """
+        """Override to add custom GL zoom."""
         if not self._activeState:
             pos = event.pos()
             glCoords = self._camera.mapScreenToGl([pos.x(), pos.y()])
@@ -157,7 +159,7 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
 
     # GL EVENTS
     def initializeGL(self):
-        """ Setup GL objects for the view ready for drawing. """
+        """Setup GL objects for the view ready for drawing."""
         self._backgroundGrid = shape.Grid()
         self._camera = camera.Camera2D(self.width(), self.height())
         self._shader = shader.LineShader()
@@ -169,12 +171,12 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
         self._uvInfoFont.setPointSize(12)
 
     def resizeGL(self, width, height):
-        """ Resize the GL viewport and update the camera with the new dimensions. """
+        """Resize the GL viewport and update the camera with the new dimensions."""
         GL.glViewport(0, 0, width, height)
         self._camera.resize(width, height)
 
     def paintGL(self):
-        """ Paint all the GL objects in the scene. """
+        """Paint all the GL objects in the scene."""
         self._painter.begin(self)
 
         self._painter.beginNativePainting()
@@ -198,7 +200,7 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
         self._painter.end()
 
     def _drawText(self, painter):
-        """ Paint the grid values in the scene. """
+        """Paint the grid values in the scene."""
         originCoord = self._camera.mapWorldToScreen([0.0, 0.0])
         offsetCoord = self._camera.mapWorldToScreen([0.1, 0.1])
 
@@ -219,7 +221,14 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
                 top = originY - increment * height
 
             text = str(offset)
-            painter.drawText(left, top, doubleWidth, height, QtCore.Qt.AlignLeft | QtCore.Qt.AlignBottom, text)
+            painter.drawText(
+                left,
+                top,
+                doubleWidth,
+                height,
+                QtCore.Qt.AlignLeft | QtCore.Qt.AlignBottom,
+                text,
+            )
 
         painter.setPen(QtCore.Qt.black)
         painter.setFont(self._gridNumbersFont)
@@ -232,7 +241,7 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
             drawText(-i, xAxis=False)
 
     def _drawMouseUVPosition(self, painter):
-        """ Draw the corresponding uv position from the current mouse position over the widget. """
+        """Draw the corresponding uv position from the current mouse position over the widget."""
         cursor = QtGui.QCursor()
         position = self.mapFromGlobal(cursor.pos())
         uvPos = self._camera.mapScreenToWorld([position.x(), position.y()])
@@ -240,4 +249,11 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
 
         painter.setPen(QtCore.Qt.white)
         painter.setFont(self._uvInfoFont)
-        painter.drawText(5, self.height() - 40, 200, 40, QtCore.Qt.AlignLeft | QtCore.Qt.AlignBottom, displayString)
+        painter.drawText(
+            5,
+            self.height() - 40,
+            200,
+            40,
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignBottom,
+            displayString,
+        )
