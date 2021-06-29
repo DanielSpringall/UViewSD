@@ -35,6 +35,11 @@ def getLineShader():
     return lineShader
 
 
+def deleteLineShader():
+    global lineShader
+    lineShader = None
+
+
 class ShaderProgram:
     programShaderType = "program"
     vertexShaderType = "vertex"

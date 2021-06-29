@@ -12,6 +12,9 @@ class USDViewerUVWindow(window.UVViewerWindow):
             stage=usdviewApi.stage,
             parent=usdviewApi.qMainWindow,
         )
+        # Trigger the selection update call in case the user had something selected
+        # before the window was opened.
+        self.selectionChanged()
 
     def _setupConnections(self):
         window.UVViewerWindow._setupConnections(self)

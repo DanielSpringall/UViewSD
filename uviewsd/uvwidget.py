@@ -4,6 +4,7 @@
 from uviewsd import shape
 from uviewsd import states
 from uviewsd import camera
+from uviewsd import shader
 
 from PySide2 import QtWidgets, QtGui, QtCore
 from OpenGL import GL
@@ -31,6 +32,9 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
 
         self.setMouseTracking(self._showCurrentMouseUVPosition)
         self.setMinimumSize(400, 400)
+
+        # Make sure we aren't using a shader that was bound during a previous viewer setup.
+        shader.deleteLineShader()
 
     # SHAPE MANAGEMENT
     def addShapes(self, shapes):
