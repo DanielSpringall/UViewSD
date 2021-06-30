@@ -17,7 +17,7 @@ class UVExtractor:
 
     def __init__(self, prim):
         """Helper class for extracting uv data from a USDGeom mesh."""
-        self._mesh = UsdGeom.Mesh(prim)
+        self._mesh = UsdGeom.Mesh(prim) if prim.IsValid() else None
         self._validUVNames = None
 
     def prim(self):
@@ -32,13 +32,13 @@ class UVExtractor:
         if not self._mesh:
             logger.debug("Invalid mesh for uv data. %s.", self._mesh)
             return False
-        if not self._mesh.GetFaceVertexCountsAttr():
+        if not self._mesh.GetFaceVertexCountsAttr().HasValue():
             logger.debug(
                 "Invalid mesh for uv data. %s. Missing face vertex count attribute.",
                 self._mesh,
             )
             return False
-        if not self._mesh.GetFaceVertexIndicesAttr():
+        if not self._mesh.GetFaceVertexIndicesAttr().HasValue():
             logger.debug(
                 "Invalid mesh for uv data. %s. Missing face vertex indices attribute.",
                 self._mesh,
@@ -54,10 +54,11 @@ class UVExtractor:
         """
         if self._validUVNames is None:
             self._validUVNames = []
-            for primvar in self._mesh.GetPrimvars():
-                if primvar.GetTypeName() not in self.VALID_PRIMVAR_TYPE_NAME:
-                    continue
-                self._validUVNames.append(primvar.GetPrimvarName())
+            if self.isValid():
+                for primvar in self._mesh.GetPrimvars():
+                    if primvar.GetTypeName() not in self.VALID_PRIMVAR_TYPE_NAME:
+                        continue
+                    self._validUVNames.append(primvar.GetPrimvarName())
         return self._validUVNames
 
     def isUVNameValid(self, uvName):
@@ -180,7 +181,7 @@ class UVExtractor:
         boundaryEdges = []
         for edge, count in edgeCountMap.items():
             if count == 1:
-                boundaryEdges.append([edge.startIndex, edge.endIndex])
+                boundaryEdges.append((edge.startIndex, edge.endIndex))
         return boundaryEdges
 
 

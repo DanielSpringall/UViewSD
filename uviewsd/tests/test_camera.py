@@ -7,25 +7,94 @@ import unittest
 
 
 class CameraTestCase(unittest.TestCase):
-    def setup(self):
+    def setUp(self):
         self.initialWidth = 100
         self.initialHeight = 100
-        self._camera = camera(self.initialWidth, self.initialHeight)
+        self.camera = camera.Camera2D(self.initialWidth, self.initialHeight)
+
+    def _assertFocusRegion(self, expectedRegion):
+        self._assertListsAlmostEqual(self.camera.getFocusRegion(), expectedRegion)
+
+    def _assertListsAlmostEqual(self, actual, expected):
+        for value, expectedValue in zip(actual, expected):
+            self.assertAlmostEqual(value, expectedValue)
 
     def test_camerasetup(self):
-        pass
+        self.assertEqual(self.camera._screenWidth, self.initialWidth)
+        self.assertEqual(self.camera._screenHeight, self.initialHeight)
+        self.assertEqual(
+            self.camera._screenAspectRatio, self.initialWidth / self.initialHeight
+        )
+        bufferScale = self.camera._defaultBufferScale
+        self._assertFocusRegion(
+            (0.0 - bufferScale, 1.0 + bufferScale, 1.0 + bufferScale, 0.0 - bufferScale)
+        )
 
     def test_cameraresize(self):
-        pass
+        # Focus with no buffer to make testing focus region easier.
+        self.camera.focus(0.0, 1.0, 1.0, 0.0, bufferScale=0.0)
+        self._assertFocusRegion((0.0, 1.0, 1.0, 0.0))
 
-    def test_cameramapping(self):
-        pass
+        # Resizing should maintain width. And scale the height around the vertical mid point.
+        self.camera.resize(200.0, 100.0)
+        self._assertFocusRegion((0.0, 1.0, 0.75, 0.25))
+        self.camera.resize(100.0, 100.0)
+        self._assertFocusRegion((0.0, 1.0, 1.0, 0.0))
+        self.camera.resize(100.0, 200.0)
+        self._assertFocusRegion((0.0, 1.0, 1.5, -0.5))
 
     def test_camerapan(self):
-        pass
+        # Focus with no buffer to make testing focus region easier.
+        self.camera.focus(0.0, 1.0, 1.0, 0.0, bufferScale=0.0)
+        self._assertFocusRegion((0.0, 1.0, 1.0, 0.0))
+
+        self.camera.pan(1.0, 1.0)
+        self._assertFocusRegion((1.0, 2.0, 2.0, 1.0))
+
+        self.camera.pan(-3.0, -2.0)
+        self._assertFocusRegion((-2.0, -1.0, 0.0, -1.0))
 
     def test_camerazoom(self):
-        pass
+        # Focus with no buffer to make testing focus region easier.
+        self.camera.focus(0.0, 1.0, 1.0, 0.0, bufferScale=0.0)
+        self._assertFocusRegion((0.0, 1.0, 1.0, 0.0))
 
-    def test_camerafocusregion(self):
-        pass
+        self.camera.zoom((0.5, 0.5), 0.5)
+        self._assertFocusRegion((-0.5, 1.5, 1.5, -0.5))
+        self.camera.zoom((0.5, 0.5), 2.0)
+        self._assertFocusRegion((0.0, 1.0, 1.0, 0.0))
+
+        self.camera.zoom((1.0, 1.0), 0.5)
+        self._assertFocusRegion((-1.0, 1.0, 1.0, -1.0))
+        self.camera.zoom((1.0, 1.0), 2.0)
+        self._assertFocusRegion((0.0, 1.0, 1.0, 0.0))
+
+    def test_cameramapping(self):
+        # Focus with no buffer to make testing focus region easier.
+        self.camera.focus(0.0, 1.0, 1.0, 0.0, bufferScale=0.0)
+        self._assertFocusRegion((0.0, 1.0, 1.0, 0.0))
+
+        self._assertListsAlmostEqual(
+            (50.0, 50.0),
+            self.camera.mapWorldToScreen((0.5, 0.5)),
+        )
+        self._assertListsAlmostEqual(
+            (0.75, 0.75),
+            self.camera.mapGlToWorld((0.5, 0.5)),
+        )
+        self._assertListsAlmostEqual(
+            (1.0, 0.0),
+            self.camera.mapScreenToWorld((100.0, 100.0)),
+        )
+        self._assertListsAlmostEqual(
+            (0.5, -0.5),
+            self.camera.mapScreenToGl((75.0, 75.0)),
+        )
+        self._assertListsAlmostEqual(
+            (25.0, 25.0),
+            self.camera.mapGlToScreen((-0.5, 0.5)),
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()

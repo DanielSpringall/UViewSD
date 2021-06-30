@@ -17,15 +17,16 @@ class Camera2D:
         self._screenAspectRatio = width / height
         # Cached focus region used to prevent jittering when consecutively calling resize. e.g. during user window resize.
         self._initResizeFocusRegion = None
+        self._defaultBufferScale = 0.1
 
         # Cached projection matrix and matrices used for internal calculations
         self._projMat = None
         self._invProjMat = None
 
         # Initial camera focus
-        self.focus(0, 1, 1, 0)
+        self.focus(0.0, 1.0, 1.0, 0.0)
 
-    def focus(self, left, right, top, bottom, bufferScale=0.1, clearFocusCache=True):
+    def focus(self, left, right, top, bottom, bufferScale=None, clearFocusCache=True):
         """Focus the projection matrix to a given square denoted by left/right/top/bottom units.
         All units are interpreted as world unites. Will take the image width/height into
         account to ensure the focus region fits inside it.
@@ -35,9 +36,13 @@ class Camera2D:
             right (float): The right unit in world space of the focus region.
             top (float): The top unit in world space of the focus region.
             bottom (float): The bottom unit in world space of the focus region.
-            bufferScale (float): Value multiplied by width/height to add as horizontal/vertical buffer to the focus region. 0.1 = 10%.
+            bufferScale (float | None): Value multiplied by width/height to add as horizontal/vertical buffer
+                                        to the focus region. If None, fall back on camera default buffer scale.
             clearFocusCache (bool): If True, clear the cached focus region used during resize.
         """
+        if bufferScale is None:
+            bufferScale = self._defaultBufferScale
+
         width = right - left
         height = top - bottom
         aspectRatio = width / height
@@ -70,7 +75,7 @@ class Camera2D:
         """Extract the focus region from the cameras projection matrix.
 
         Returns:
-            list[float, float, float, float]: Left, right, top, bottom values of the focus region.
+            tuple(float, float, float, float): Left, right, top, bottom values of the focus region.
         """
         projectionMat = self.projectionMatrix()
         xScale = projectionMat[0][0]
@@ -78,24 +83,24 @@ class Camera2D:
         xTransform = projectionMat[0][3]
         yTransform = projectionMat[1][3]
 
-        left = -(1 + xTransform) / xScale
-        right = (1 - xTransform) / xScale
-        top = (1 - yTransform) / yScale
-        bottom = -(1 + yTransform) / yScale
+        left = -(1.0 + xTransform) / xScale
+        right = (1.0 - xTransform) / xScale
+        top = (1.0 - yTransform) / yScale
+        bottom = -(1.0 + yTransform) / yScale
 
-        return [left, right, top, bottom]
+        return (left, right, top, bottom)
 
-    def pan(self, x=0, y=0):
+    def pan(self, x=0.0, y=0.0):
         """Pan the projection matrix.
 
         Args:
             x (float): The amount of translation along the x axis in world space units.
             y (float): The amount of translation along the y axis in world space units.
         """
-        if x == 0 and y == 0:
+        if x == 0.0 and y == 0.0:
             return
 
-        transformationMatrix = self.createTransformationMatrix(x, y)
+        transformationMatrix = self.createTransformationMatrix(-x, -y)
         self.setProjectionMatrix(np.matmul(self._projMat, transformationMatrix))
 
     def mapGlToScreen(self, coord):
@@ -107,8 +112,8 @@ class Camera2D:
             list[float, float]: The Qt mapped screen co-ordinate.
         """
         return [
-            (coord[0] / 2 + 0.5) * self._screenWidth,
-            (coord[1] / -2 + 0.5) * self._screenHeight,
+            (coord[0] / 2.0 + 0.5) * self._screenWidth,
+            (coord[1] / -2.0 + 0.5) * self._screenHeight,
         ]
 
     def mapScreenToGl(self, coord):
@@ -120,8 +125,8 @@ class Camera2D:
             list[float, float]: The GL mapped screen co-ordinate.
         """
         return [
-            coord[0] / self._screenWidth * 2 - 1,
-            (coord[1] / self._screenHeight - 0.5) * -2,
+            coord[0] / self._screenWidth * 2.0 - 1.0,
+            (coord[1] / self._screenHeight - 0.5) * -2.0,
         ]
 
     def mapScreenToWorld(self, coord):

@@ -95,7 +95,7 @@ class ZoomState(BaseState):
         screenCoord = self._glScreenCoord(event)
         xZoom = screenCoord[0] - self._initGlScreenCoord[0]
         yZoom = self._initGlScreenCoord[1] - screenCoord[1]
-        zoomAmount = max(0.01, 1 + (xZoom + yZoom) / 2.0)
+        zoomAmount = max(0.01, 1.0 + (xZoom + yZoom) / 2.0)
         zoomedProjectionMatrix = self._camera.scaleMatrixAroundPoint(
             matrix=self._initProjMat,
             xScale=zoomAmount,

@@ -111,7 +111,7 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
     def focusOnBBox(self):
         """Focus the viewer on the bbox surounding all the currently displayed shapes."""
         if not self._shapes:
-            self._camera.focus(0, 1, 1, 0)
+            self._camera.focus(0.0, 1.0, 1.0, 0.0)
         else:
             bbox = None
             for _shape in self._shapes:
@@ -158,7 +158,7 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
             glCoords = self._camera.mapScreenToGl([pos.x(), pos.y()])
             worldCoords = self._camera.mapGlToWorld(glCoords)
             delta = event.angleDelta().y()
-            zoomAmount = 1 + (delta and delta // abs(delta)) * 0.03
+            zoomAmount = 1.0 + (delta and delta // abs(delta)) * 0.03
             self._camera.zoom(worldCoords, zoomAmount)
             self.update()
         self.setFocus()
@@ -212,13 +212,13 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
 
         width = offsetCoord[0] - originCoord[0]
         height = originCoord[1] - offsetCoord[1]
-        doubleWidth = width * 2
+        doubleWidth = width * 2.0
         # Offset x a little to prevent intersection with the vertical grid line
-        originX = originCoord[0] + width / 20
+        originX = originCoord[0] + width / 20.0
         originY = originCoord[1] - height
 
         def drawText(increment, xAxis=True):
-            offset = float(increment) / 10
+            offset = float(increment) / 10.0
             if xAxis:
                 left = originX + increment * width
                 top = originY
