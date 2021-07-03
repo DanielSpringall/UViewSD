@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 # USD
-class UVExtractor:
+class PrimUVDataExtractor:
     VALID_PRIMVAR_TYPE_NAME = ["texCoord2f[]", "float2[]"]
 
     def __init__(self, prim):
@@ -64,7 +64,7 @@ class UVExtractor:
     def isUVNameValid(self, uvName):
         return uvName in self.validUVNames()
 
-    def uvData(self, uvName):
+    def data(self, uvName):
         """Extract the uv data of a specific name from the mesh.
 
         Args:
@@ -262,7 +262,8 @@ class UVShape:
 
     def initializeBoundaryGLData(self):
         self._boundaryIndices = np.array(
-            UVExtractor.edgeBoundariesFromEdgeIndices(self._indices), dtype=np.int
+            PrimUVDataExtractor.edgeBoundariesFromEdgeIndices(self._indices),
+            dtype=np.int,
         )
         self._numBoundaryUVs = self._boundaryIndices.flatten().size
 

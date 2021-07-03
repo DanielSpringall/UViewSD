@@ -15,8 +15,10 @@ logger = logging.getLogger(__name__)
 
 
 class UVViewerWidget(QtWidgets.QOpenGLWidget):
-    def __init__(self, *args, **kwargs):
-        QtWidgets.QOpenGLWidget.__init__(self, *args, **kwargs)
+    """Widget responsible for drawing the GL elements."""
+
+    def __init__(self, config=None, parent=None):
+        QtWidgets.QOpenGLWidget.__init__(self, parent=parent)
 
         self._painter = None
         self._uvInfoFont = None
@@ -25,13 +27,16 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
 
         self._activeState = None
         self._backgroundGrid = None
+        self._textureShape = None
         self._shapes = []
         self._camera = None
         self._shader = None
 
-        self._showGrid = True
-        self._showCurrentMouseUVPosition = False
-        self._showUVEdgeBoundaryHighlight = True
+        config = config if config is not None else ViewerConfiguration()
+        self._showTexture = config.displayTexture
+        self._showGrid = config.displayGrid
+        self._showUVEdgeBoundaryHighlight = config.displayUVBorder
+        self._showCurrentMouseUVPosition = config.displayUVPos
 
         self.setMouseTracking(self._showCurrentMouseUVPosition)
         self.setMinimumSize(400, 400)
@@ -78,11 +83,29 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
         if shapesRemoved and update:
             self.update()
 
-    def clear(self):
-        """Clear all the shapes drawn in the view."""
-        if not self._shapes:
+    def setTextureShape(self, shape):
+        """Set the shape used to draw the texture map in the view.
+
+        Args:
+            shape (shape.TextureShape | None):
+                The shape to draw for the texture, or None if you want to remove the current one.
+        """
+        self._textureShape = shape
+        if self._showTexture:
+            self.update()
+
+    def clear(self, removeTexture=False):
+        """Clear all the shapes drawn in the view.
+
+        Args:
+            removeTexture (bool):
+                If true, removes the shape used to draw the texture in the view.
+        """
+        if not self._shapes and (removeTexture and not self._textureShape):
             return
         self._shapes = []
+        if removeTexture:
+            self._textureShape = None
         self.update()
 
     # VIEW ACTIONS
@@ -108,6 +131,15 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
             self._showUVEdgeBoundaryHighlight = visible
             self.update()
 
+    def setTextureVisible(self, visible):
+        """Set the visible state of the texture shape."""
+        visible = bool(visible)
+        if self._showTexture != visible:
+            self._showTexture = visible
+            # Only need to do an update if an actual texture shape exists.
+            if self._textureShape:
+                self.update()
+
     def focusOnBBox(self):
         """Focus the viewer on the bbox surounding all the currently displayed shapes."""
         if not self._shapes:
@@ -121,6 +153,23 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
                     bbox.updateWithBBox(_shape.bbox())
             self._camera.focus(bbox.xMin, bbox.xMax, bbox.yMax, bbox.yMin)
         self.update()
+
+    def changeBackgroundColor(self, color):
+        """Change the background color used in the viewer.
+
+        Args:
+            tuple(int, int, int, int):
+                RGBA values of the color to set as the background color.
+        """
+        if not isinstance(color, (list, tuple)) or len(color) != 4:
+            raise RuntimeError(
+                "Invalid color value to set %s. Must be list or set of 4 integers.",
+                color,
+            )
+
+        if color != self._backgroundColor:
+            self._backgroundColor = color
+            self.update()
 
     # QT EVENTS
     def keyPressEvent(self, event):
@@ -190,15 +239,25 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
         GL.glClear(GL.GL_COLOR_BUFFER_BIT)
 
         projectionMatrix = self._camera.glProjectionMatrix()
+
+        # Draw texture
+        if self._showTexture and self._textureShape:
+            self._textureShape.draw(projectionMatrix)
+
+        # Setup the shader used for both the grid and uv shapes.
         self._shader.use()
         self._shader.setMatrix4f("viewMatrix", projectionMatrix)
 
+        # Draw grid
         if self._showGrid:
             self._backgroundGrid.draw(self._shader)
+
+        # Draw UVs
         for _shape in self._shapes:
             _shape.draw(self._shader, drawBoundaries=self._showUVEdgeBoundaryHighlight)
         self._painter.endNativePainting()
 
+        # Draw text
         if self._showGrid:
             self._drawText(self._painter)
         if self._showCurrentMouseUVPosition:
@@ -263,3 +322,13 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
             QtCore.Qt.AlignLeft | QtCore.Qt.AlignBottom,
             displayString,
         )
+
+
+class ViewerConfiguration:
+    """Class containing configuration for the viewer."""
+
+    def __init__(self):
+        self.displayTexture = False
+        self.displayGrid = True
+        self.displayUVBorder = False
+        self.displayUVPos = False

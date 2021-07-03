@@ -2,7 +2,7 @@
 # This file is part of UViewSD, and is released under the "MIT License Agreement".
 # Please see the LICENSE file that should have been included as part of this package.
 from uviewsd import shape
-from pxr import Usd, UsdGeom
+from pxr import Usd
 
 import unittest
 import os
@@ -24,13 +24,13 @@ class UVShapeExtractorTestCase(unittest.TestCase):
 
     def test_invalidprim(self):
         prim = self.loadTestDataPrim("invalid")
-        extractor = shape.UVExtractor(prim)
+        extractor = shape.PrimUVDataExtractor(prim)
         self.assertFalse(extractor.isValid())
         self.assertEqual(extractor.validUVNames(), [])
 
     def test_uvsetname(self):
         prim = self.loadTestDataPrim("mulitpleuvnames")
-        extractor = shape.UVExtractor(prim)
+        extractor = shape.PrimUVDataExtractor(prim)
         self.assertTrue(extractor.isValid())
         self.assertEqual(extractor.prim(), prim)
 
@@ -42,7 +42,7 @@ class UVShapeExtractorTestCase(unittest.TestCase):
 
     def test_uvdata_facevarying(self):
         prim = self.loadTestDataPrim("facevarying")
-        extractor = shape.UVExtractor(prim)
+        extractor = shape.PrimUVDataExtractor(prim)
         self.assertTrue(extractor.isValid())
         uvName = "st"
         self.assertEqual(extractor.validUVNames(), [uvName])
@@ -89,13 +89,13 @@ class UVShapeExtractorTestCase(unittest.TestCase):
             (2, 13),
             (13, 12),
         ]
-        [uvPositions, edgeIndices] = extractor.uvData(uvName)
+        [uvPositions, edgeIndices] = extractor.data(uvName)
         self.assertEqual(expectedPositions, uvPositions)
         self.assertEqual(expectedIndices, edgeIndices)
 
     def test_uvdata_vertexvarying(self):
         prim = self.loadTestDataPrim("vertexvarying")
-        extractor = shape.UVExtractor(prim)
+        extractor = shape.PrimUVDataExtractor(prim)
         self.assertTrue(extractor.isValid())
         uvName = "st"
         self.assertEqual(extractor.validUVNames(), [uvName])
@@ -132,17 +132,17 @@ class UVShapeExtractorTestCase(unittest.TestCase):
             (2, 4),
             (4, 6),
         ]
-        [uvPositions, edgeIndices] = extractor.uvData(uvName)
+        [uvPositions, edgeIndices] = extractor.data(uvName)
         self.assertEqual(expectedPositions, uvPositions)
         self.assertEqual(expectedIndices, edgeIndices)
 
     def test_uvborder(self):
         prim = self.loadTestDataPrim("uvborders")
-        extractor = shape.UVExtractor(prim)
+        extractor = shape.PrimUVDataExtractor(prim)
         self.assertTrue(extractor.isValid())
         uvName = "st"
         self.assertEqual(extractor.validUVNames(), [uvName])
-        [_, edgeIndices] = extractor.uvData(uvName)
+        [_, edgeIndices] = extractor.data(uvName)
 
         expectedIndices = [
             (0, 1),
@@ -164,7 +164,7 @@ class UVShapeExtractorTestCase(unittest.TestCase):
             (15, 16),
             (2, 4),
         ]
-        edgeIndices = shape.UVExtractor.edgeBoundariesFromEdgeIndices(edgeIndices)
+        edgeIndices = extractor.edgeBoundariesFromEdgeIndices(edgeIndices)
         self.assertEqual(expectedIndices, edgeIndices)
 
 
