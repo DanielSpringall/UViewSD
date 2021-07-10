@@ -4,42 +4,21 @@
 from OpenGL import GL
 
 
-VERTEX_SHADER = """#version 330
-
-layout (location = 0) in vec2 vPos;
-uniform mat4 viewMatrix;
-
-void main()
-{
-    gl_Position = viewMatrix * vec4(vPos.xy, 0.5, 1.0);
-}
-"""
-
-
-FRAGMENT_SHADER = """#version 330
-
-uniform vec3 color;
-out vec4 fragColor;
-
-void main()
-{
-    fragColor = vec4(color, 1.0);
-}
-"""
-
-
-class LineShader:
+class BaseShader:
     def __init__(self):
         self.programId = None
-        self._bind()
+        self.bind()
 
-    def _bind(self):
+    def bind(self):
+        if self.programId:
+            return
+
         vertexShader = GL.glCreateShader(GL.GL_VERTEX_SHADER)
-        GL.glShaderSource(vertexShader, VERTEX_SHADER)
+        GL.glShaderSource(vertexShader, self.vertexShader())
         self._checkShaderErrors(vertexShader, "vertex")
 
         fragmentShader = GL.glCreateShader(GL.GL_FRAGMENT_SHADER)
-        GL.glShaderSource(fragmentShader, FRAGMENT_SHADER)
+        GL.glShaderSource(fragmentShader, self.fragmentShader())
         self._checkShaderErrors(fragmentShader, "fragment")
 
         self.programId = GL.glCreateProgram()
@@ -83,3 +62,69 @@ class LineShader:
                 else "{} shader compilation".format(shaderName)
             )
             raise RuntimeError("Failed {}: {}".format(failType, info))
+
+    @staticmethod
+    def vertexShader():
+        raise NotImplementedError()
+
+    @staticmethod
+    def fragmentShader():
+        raise NotImplementedError()
+
+
+class LineShader(BaseShader):
+    @staticmethod
+    def vertexShader():
+        return """#version 330
+
+layout (location = 0) in vec2 vPos;
+uniform mat4 viewMatrix;
+
+void main()
+{
+    gl_Position = viewMatrix * vec4(vPos.xy, 0.5, 1.0);
+}
+"""
+
+    @staticmethod
+    def fragmentShader():
+        return """#version 330
+
+uniform vec3 color;
+out vec4 fragColor;
+
+void main()
+{
+    fragColor = vec4(color, 1.0);
+}
+"""
+
+
+class TextureShader(BaseShader):
+    @staticmethod
+    def vertexShader():
+        return """#version 330
+
+in vec2 position;
+out vec2 OutTexCoords;
+
+void main()
+{
+    gl_Position = vec4(position, 0.0, 1.0);
+    OutTexCoords = position;
+}
+"""
+
+    @staticmethod
+    def fragmentShader():
+        return """#version 330
+
+in vec2 OutTexCoords;
+uniform sampler2D samplerTex;
+out vec4 fragColor;
+
+void main()
+{
+    fragColor = texture(samplerTex, OutTexCoords);
+}
+"""

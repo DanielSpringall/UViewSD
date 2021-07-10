@@ -30,7 +30,7 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
         self._textureShape = None
         self._shapes = []
         self._camera = None
-        self._shader = None
+        self._lineShader = None
 
         config = config if config is not None else ViewerConfiguration()
         self._showTexture = config.displayTexture
@@ -217,7 +217,8 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
         """Setup GL objects for the view ready for drawing."""
         self._backgroundGrid = shape.Grid()
         self._camera = camera.Camera2D(self.width(), self.height())
-        self._shader = shader.LineShader()
+        self._lineShader = shader.LineShader()
+        self._textureShader = shader.TextureShader()
         self._painter = QtGui.QPainter()
 
         self._gridNumbersFont = QtGui.QFont()
@@ -242,19 +243,21 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
 
         # Draw texture
         if self._showTexture and self._textureShape:
+            self._textureShader.use()
+            self._textureShader.setMatrix4f("viewMatrix", projectionMatrix)
             self._textureShape.draw(projectionMatrix)
 
         # Setup the shader used for both the grid and uv shapes.
-        self._shader.use()
-        self._shader.setMatrix4f("viewMatrix", projectionMatrix)
+        self._lineShader.use()
+        self._lineShader.setMatrix4f("viewMatrix", projectionMatrix)
 
         # Draw grid
         if self._showGrid:
-            self._backgroundGrid.draw(self._shader)
+            self._backgroundGrid.draw(self._lineShader)
 
         # Draw UVs
         for _shape in self._shapes:
-            _shape.draw(self._shader, drawBoundaries=self._showUVEdgeBoundaryHighlight)
+            _shape.draw(self._lineShader, drawBoundaries=self._showUVEdgeBoundaryHighlight)
         self._painter.endNativePainting()
 
         # Draw text

@@ -24,13 +24,13 @@ class UVShapeExtractorTestCase(unittest.TestCase):
 
     def test_invalidprim(self):
         prim = self.loadTestDataPrim("invalid")
-        extractor = shape.PrimUVDataExtractor(prim)
+        extractor = shape.PrimDataExtractor(prim)
         self.assertFalse(extractor.isValid())
         self.assertEqual(extractor.validUVNames(), [])
 
     def test_uvsetname(self):
         prim = self.loadTestDataPrim("mulitpleuvnames")
-        extractor = shape.PrimUVDataExtractor(prim)
+        extractor = shape.PrimDataExtractor(prim)
         self.assertTrue(extractor.isValid())
         self.assertEqual(extractor.prim(), prim)
 
@@ -42,7 +42,7 @@ class UVShapeExtractorTestCase(unittest.TestCase):
 
     def test_uvdata_facevarying(self):
         prim = self.loadTestDataPrim("facevarying")
-        extractor = shape.PrimUVDataExtractor(prim)
+        extractor = shape.PrimDataExtractor(prim)
         self.assertTrue(extractor.isValid())
         uvName = "st"
         self.assertEqual(extractor.validUVNames(), [uvName])
@@ -95,7 +95,7 @@ class UVShapeExtractorTestCase(unittest.TestCase):
 
     def test_uvdata_vertexvarying(self):
         prim = self.loadTestDataPrim("vertexvarying")
-        extractor = shape.PrimUVDataExtractor(prim)
+        extractor = shape.PrimDataExtractor(prim)
         self.assertTrue(extractor.isValid())
         uvName = "st"
         self.assertEqual(extractor.validUVNames(), [uvName])
@@ -138,7 +138,7 @@ class UVShapeExtractorTestCase(unittest.TestCase):
 
     def test_uvborder(self):
         prim = self.loadTestDataPrim("uvborders")
-        extractor = shape.PrimUVDataExtractor(prim)
+        extractor = shape.PrimDataExtractor(prim)
         self.assertTrue(extractor.isValid())
         uvName = "st"
         self.assertEqual(extractor.validUVNames(), [uvName])

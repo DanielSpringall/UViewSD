@@ -21,7 +21,7 @@ def run():
     stage = Usd.Stage.Open(
         "C:\\Libraries\\USD\\share\\usd\\Attic_NVIDIA\\Attic_NVIDIA.usd"
     )
-    primPaths = ["/Root/Geometry/wood_walls2/wood_walls/Section4"]
+    primPaths = ["/Root/Geometry/clock_475/clock/Section1"]
 
     # KITCHEN
     # stage = Usd.Stage.Open(

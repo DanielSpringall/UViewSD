@@ -3,21 +3,25 @@
 # Please see the LICENSE file that should have been included as part of this package.
 from ctypes import c_void_p
 from OpenGL import GL
-from pxr import UsdGeom
+from pxr import UsdGeom, UsdShade, Sdf
 import numpy as np
+from PIL import Image
 
+import os
 import logging
 
 logger = logging.getLogger(__name__)
 
 
 # USD
-class PrimUVDataExtractor:
-    VALID_PRIMVAR_TYPE_NAME = ["texCoord2f[]", "float2[]"]
+class PrimDataExtractor:
+    VALID_PRIMVAR_TYPE_NAME = ("texCoord2f[]", "float2[]")
+    VALID_IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".tiff", ".bmp")
 
     def __init__(self, prim):
         """Helper class for extracting uv data from a USDGeom mesh."""
         self._mesh = UsdGeom.Mesh(prim) if prim.IsValid() else None
+        self._shader = None
         self._validUVNames = None
 
     def prim(self):
@@ -46,6 +50,7 @@ class PrimUVDataExtractor:
             return False
         return True
 
+    # UV
     def validUVNames(self):
         """Get a list of uv names that are valid on the mesh.
 
@@ -64,7 +69,7 @@ class PrimUVDataExtractor:
     def isUVNameValid(self, uvName):
         return uvName in self.validUVNames()
 
-    def data(self, uvName):
+    def uvData(self, uvName):
         """Extract the uv data of a specific name from the mesh.
 
         Args:
@@ -184,6 +189,87 @@ class PrimUVDataExtractor:
                 boundaryEdges.append((edge.startIndex, edge.endIndex))
         return boundaryEdges
 
+    # TEXTURE
+    def textureData(self):
+        """
+        Get any texture file paths used as inputs to the surface shader
+        on the meshes bound material.
+
+        Returns:
+            list[str]: A unique list of texture file absolute paths.
+        """
+        shader = self.meshShader()
+        if shader is None:
+            return []
+
+        paths = []
+        for path in self._getTexturesFromShader(shader):
+            if path not in paths:
+                paths.append(path)
+
+        return paths
+
+    def meshShader(self):
+        """Get the shader used on the mesh if one exists.
+
+        Returns:
+            UsdShade.Shader | None: The shader if one exists, otherwise None.
+        """
+        if self._shader is None:
+            prim = self.prim()
+            binding = UsdShade.MaterialBindingAPI(prim)
+            (material, _) = binding.ComputeBoundMaterial()
+            if material:
+                (shader, _, __) = material.ComputeSurfaceSource()
+                if shader:
+                    self._shader = shader
+                else:
+                    logger.debug("No surface shader for %s", prim)
+            else:
+                logger.debug("No material bound to %s", prim)
+        return self._shader
+
+    @classmethod
+    def _getUpStreamInputs(cls, input, inputsVisited):
+        """Recursively search upstream for all possible inputs.
+        Args:
+            input(UsdShade.Input):
+                The input to start the search from.
+            inputsVisited(list[UsdShade.Input]):
+                List of previously visited input nodes to compare against to ensure no
+                search recursion occurs. New inputs discovered will be added to this list.
+        """
+        for connection in input.GetConnectedSources():
+            if not connection:
+                continue
+            for input in connection[0].source.GetInputs():
+                if input in inputsVisited:
+                    continue
+                inputsVisited.append(input)
+                cls._getUpStreamInputs(input, inputsVisited)
+
+    @classmethod
+    def _getTexturesFromShader(cls, shader):
+        """Extract all texture file paths used in a shader.
+
+        Returns:
+            list[str]: A unique list of texture file paths.
+        """
+        inputs = []
+        for input in shader.GetInputs():
+            inputs.append(input)
+            cls._getUpStreamInputs(input, inputs)
+
+        paths = []
+        for input in inputs:
+            attribute = input.GetAttr().Get()
+            if not isinstance(attribute, Sdf.AssetPath):
+                continue
+            path = attribute.resolvedPath
+            if os.path.isfile(path) and os.path.splitext(path)[-1] in cls.VALID_IMAGE_EXTENSIONS:
+                paths.append(path)
+        return paths
+
 
 # OPENGL
 class UVShape:
@@ -262,7 +348,7 @@ class UVShape:
 
     def initializeBoundaryGLData(self):
         self._boundaryIndices = np.array(
-            PrimUVDataExtractor.edgeBoundariesFromEdgeIndices(self._indices),
+            PrimDataExtractor.edgeBoundariesFromEdgeIndices(self._indices),
             dtype=np.int,
         )
         self._numBoundaryUVs = self._boundaryIndices.flatten().size
@@ -311,6 +397,75 @@ class UVShape:
         GL.glLineWidth(1.0)
         GL.glBindVertexArray(self._vao)
         GL.glDrawElements(GL.GL_LINES, self._numUVs, GL.GL_UNSIGNED_INT, None)
+
+        if drawBoundaries:
+            GL.glLineWidth(3.0)
+            GL.glBindVertexArray(self._bao)
+            GL.glDrawElements(
+                GL.GL_LINES, self._numBoundaryUVs, GL.GL_UNSIGNED_INT, None
+            )
+
+        GL.glBindVertexArray(0)
+
+
+class TextureShape:
+    def __init__(self, path):
+        numGridUnits = Grid.NUM_GRIDS_FROM_ORIGIN
+        self._positions = np.array(
+            [
+                -numGridUnits, -numGridUnits,
+                -numGridUnits,  numGridUnits,
+                 numGridUnits, -numGridUnits,
+                 numGridUnits, -numGridUnits,
+                 numGridUnits,  numGridUnits,
+                -numGridUnits,  numGridUnits,
+            ],
+            dtype=np.float32
+        )
+        image = Image.open(path)
+        self._imageData = np.array(list(image.getdata()), np.uint8)
+
+    def initializeGLData(self, lineData, color):
+        """Initialize the OpenGL data for a given set of line data.
+
+        Args:
+            lineData (np.array): Array of vertex positions for lines.
+            color (tuple(int, int, int)): Color made up of RGB values to draw the lines with.
+        Returns:
+            dict{vao: int, numVerts: int, color: tuple(int, int, int)}:
+                OpenGL data used to draw the lines with.
+        """
+        vao = GL.glGenVertexArrays(1)
+        pbo = GL.glGenBuffers(1)
+
+        GL.glBindVertexArray(vao)
+        GL.glBindBuffer(GL.GL_ARRAY_BUFFER, pbo)
+
+        GL.glEnableVertexAttribArray(0)
+        GL.glVertexAttribPointer(0, 2, GL.GL_FLOAT, GL.GL_FALSE, 0, c_void_p(0))
+
+        GL.glBufferData(
+            GL.GL_ARRAY_BUFFER, lineData.nbytes, lineData, GL.GL_STATIC_DRAW
+        )
+
+        GL.glBindBuffer(GL.GL_ARRAY_BUFFER, 0)
+        GL.glBindVertexArray(0)
+
+        data = {"vao": vao, "numVerts": int(len(lineData) / 2), "color": color}
+        return data
+
+    def draw(self, shader, drawBoundaries=False, **kwargs):
+        """OpenGl draw call.
+
+        Args:
+            shader (uviewsd.shader): The shader to use for the draw call. Assumed to already be set as in use.
+            drawBoundaries (bool): If true, draw the uv edge boundary highlights.
+        """
+        if not self._vao:
+            self.initializeGLData()
+
+        GL.glBindVertexArray(self._vao)
+        GL.glDrawElements(GL.GL_, self._numUVs, GL.GL_UNSIGNED_INT, None)
 
         if drawBoundaries:
             GL.glLineWidth(3.0)

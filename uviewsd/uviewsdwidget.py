@@ -24,6 +24,8 @@ class UViewSDWidget(QtWidgets.QWidget):
         self._uvBorderHighlightToggleButton = None
         self._uvDataLabelToggleButton = None
         self._uvSetNameComboBox = None
+        self._textureDisplayToggleButton = None
+        self._texturePathComboBox = None
 
         # Initialise UI
         QtWidgets.QWidget.__init__(self, parent=parent)
@@ -43,6 +45,8 @@ class UViewSDWidget(QtWidgets.QWidget):
 
         if self._config.showViewerController:
             layout.addLayout(self._setupViewerControlLayout())
+        if self._config.enableTextureDisplayToggle:
+            layout.addLayout(self._setupTextureControlLayout())
         layout.addWidget(self._view)
 
         self.setLayout(layout)
@@ -106,11 +110,48 @@ class UViewSDWidget(QtWidgets.QWidget):
 
         return layout
 
+    def _setupTextureControlLayout(self):
+        """Create and return a layout containing texture combo box/options."""
+        layout = QtWidgets.QHBoxLayout()
+        layout.setContentsMargins(5, 3, 5, 3)
+        layout.setSpacing(3)
+
+        textureLabel = QtWidgets.QLabel()
+        textureLabel.setText("Texture:")
+        textureLabel.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
+        self._texturePathComboBox = QtWidgets.QComboBox()
+        self._texturePathComboBox.setToolTip("Texture path to display in the viewer.")
+        self._texturePathComboBox.setMinimumWidth(200)
+        self._texturePathComboBox.setSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
+        )
+
+        spacerLine = QtWidgets.QFrame()
+        spacerLine.setFrameShape(QtWidgets.QFrame.VLine)
+        spacerLine.setFrameShadow(QtWidgets.QFrame.Sunken)
+
+        self._textureDisplayToggleButton = QtWidgets.QCheckBox()
+        self._textureDisplayToggleButton.setText("Display Texture")
+        self._textureDisplayToggleButton.setToolTip(
+            "Enable/disable display of texture."
+        )
+        self._textureDisplayToggleButton.setChecked(self._view._showTexture)
+
+        layout.addWidget(textureLabel)
+        layout.addWidget(self._texturePathComboBox)
+        layout.addWidget(spacerLine)
+        layout.addWidget(self._textureDisplayToggleButton)
+        return layout
+
     def _setupConnections(self):
         # Combo boxes
         if self._uvSetNameComboBox:
             self._uvSetNameComboBox.currentIndexChanged.connect(
                 self.onUVSetNameSelected
+            )
+        if self._texturePathComboBox:
+            self._texturePathComboBox.currentIndexChanged.connect(
+                self.onTexturePathSelected
             )
 
         # Toggle buttons
@@ -128,6 +169,13 @@ class UViewSDWidget(QtWidgets.QWidget):
             self._uvDataLabelToggleButton.clicked.connect(
                 lambda: self._view.setMouseUVPositionDisplay(
                     self._uvDataLabelToggleButton.isChecked()
+                )
+            )
+
+        if self._textureDisplayToggleButton:
+            self._textureDisplayToggleButton.clicked.connect(
+                lambda: self._view.setTextureVisible(
+                    self._textureDisplayToggleButton.isChecked()
                 )
             )
 
@@ -204,6 +252,57 @@ class UViewSDWidget(QtWidgets.QWidget):
         if changed:
             self.updateView(replace=True)
 
+    # TEXTURES
+    def setTexturePath(self, path, enable=False):
+        """Programatically set a texture path to be selected in the teture path combo box.
+        If the texture display is currently active, the texture will be displayed in the view.
+        Args:
+            path (str): The texture path to add.
+            enable (bool): If true, ensure the texture display is enabled to view the texture.
+        """
+        changed = self._sessionManager.setActiveTexturePath(path)
+        if not changed and not enable:
+            return
+
+        # TODO: Actually create the texture shape.
+        if enable:
+            self._textureDisplayToggleButton.setChecked(True)
+        self.onTexturePathSelected()
+
+    def _updateTextureOptions(self):
+        """Update the texture path combo box."""
+        availableTexturePaths = self._sessionManager.availableTexturePaths()
+        recentTexturePaths = self._sessionManager.recentTexturePaths()
+        allPaths = recentTexturePaths + availableTexturePaths
+        if not allPaths and self._texturePathComboBox.count() == 0:
+            return
+        activeTexturePath = self._sessionManager.activeTexturePath()
+        indexToSet = allPaths.item(activeTexturePath) if activeTexturePath else None
+
+        try:
+            self._texturePathComboBox.blockSignals(True)
+            self._texturePathComboBox.clear()
+            for path in allPaths:
+                self._texturePathComboBox.addItem(path)
+            if indexToSet:
+                self._texturePathComboBox.setCurrentIndex(indexToSet)
+            else:
+                self._texturePathComboBox.insertItem(0, "")
+                self._texturePathComboBox.setCurrentIndex(0)
+        finally:
+            self._texturePathComboBox.blockSignals(False)
+
+    def onTexturePathSelected(self):
+        """
+        Triggered from user selection of the texture path.
+        If the new selection is not what is already in use, set the new texture
+        shape in the view.
+        """
+        path = self._texturePathComboBox.currentText()
+        changed = self._sessionManager.setActiveTexturePath(path)
+        if changed:
+            self.updateTexture()
+
     # VIEWER MANAGEMENT
     def setStage(self, stage):
         """Set a new stage and update reset the viewer."""
@@ -221,6 +320,7 @@ class UViewSDWidget(QtWidgets.QWidget):
         extractors = self._sessionManager.addPrimPaths(primPaths, replace)
         if extractors or replace:
             self._updateUvSetNameOptions()
+            self._updateTextureOptions()
             self.updateView(extractors=extractors, replace=replace)
 
     def addPrims(self, prims, replace=False):
@@ -233,6 +333,7 @@ class UViewSDWidget(QtWidgets.QWidget):
         extractors = self._sessionManager.addPrims(prims, replace)
         if extractors or replace:
             self._updateUvSetNameOptions()
+            self._updateTextureOptions()
             self.updateView(extractors=extractors, replace=replace)
 
     def updateView(self, uvSetName=None, extractors=None, replace=False):
@@ -241,7 +342,7 @@ class UViewSDWidget(QtWidgets.QWidget):
         Args:
             uvSetName (str | None):
                 The uv set name to use. If None, get the active uv set name from the session manager.
-            extractors (list[shape.PrimUVDataExtractor] | None):
+            extractors (list[shape.PrimDataExtractor] | None):
                 A list of extractors to pull the shape data from. If None, get the list of
                 cached extractors from the session manager.
             replace (bool): If True, will clear the current uv's from the view before adding anything new.
@@ -252,10 +353,21 @@ class UViewSDWidget(QtWidgets.QWidget):
         if shapeData:
             self._view.addShapes(shapeData)
 
+    def updateTexture(self, path=None):
+        """Update the texture used in the view.
+
+        Args:
+            path (str | None):
+                The texture path to use. If None, get the active texture path from the session manager.
+        """
+        textureShape = self._sessionManager.getTextureShape(path)
+        self._view.setTextureShape(textureShape)
+
     def refreshView(self):
         """Refresh the viewer with the current cache extractors and uvName."""
         self._view.clear()
         self._updateUvSetNameOptions()
+        self._updateTextureOptions()
         self.updateView()
 
     def clear(self):
@@ -278,6 +390,7 @@ class UIConfiguration(viewerwidget.ViewerConfiguration):
         self.enableUVBorderToggle = True
         self.enableGridToggle = True
         self.enableUVPositionToggle = True
+        self.enableTextureDisplayToggle = True
 
     @property
     def showViewerController(self):
