@@ -488,7 +488,6 @@ class TextureShape:
 
         if self._positions[0][0] != 0.0 or self._textureRepeat:
             self._positions = self._positionData()
-            GL.glBindVertexArray(self._vao)
             GL.glBindBuffer(GL.GL_ARRAY_BUFFER, self._vbo)
             GL.glBufferData(
                 GL.GL_ARRAY_BUFFER,
@@ -496,6 +495,7 @@ class TextureShape:
                 self._positions,
                 GL.GL_STATIC_DRAW,
             )
+            GL.glBindBuffer(GL.GL_ARRAY_BUFFER, 0)
 
         self._update = False
 
