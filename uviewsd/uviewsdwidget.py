@@ -3,7 +3,7 @@
 # Please see the LICENSE file that should have been included as part of this package.
 from uviewsd import sessionmanager
 from uviewsd import viewerwidget
-from uviewsd import shape
+from uviewsd import extractors
 
 from PySide2 import QtWidgets, QtCore
 
@@ -338,11 +338,7 @@ class UViewSDWidget(QtWidgets.QWidget):
         path = self._texturePathComboBox.currentText()
         if not path:
             return
-
-        success = self._sessionManager.setActiveTexturePath(path)
-        if success:
-            self._updateTextureOptions()
-            self.updateTexture()
+        self.setTexturePath(path, enable=True)
 
     def _onTextureToggled(self):
         """Triggered from user toggling texture visibility."""
@@ -353,7 +349,7 @@ class UViewSDWidget(QtWidgets.QWidget):
         self.updateTexture()
 
     def _openTexturePrompt(self):
-        extensions = shape.PrimDataExtractor.VALID_IMAGE_EXTENSIONS
+        extensions = extractors.VALID_IMAGE_EXTENSIONS
         filterString = "Image (*" + " *".join(extensions) + ")"
         fileToLoad = QtWidgets.QFileDialog.getOpenFileName(
             self, "Load Image", filter=filterString
@@ -400,7 +396,7 @@ class UViewSDWidget(QtWidgets.QWidget):
         Args:
             uvSetName (str | None):
                 The uv set name to use. If None, get the active uv set name from the session manager.
-            extractors (list[shape.PrimDataExtractor] | None):
+            extractors (list[extractors.PrimDataExtractor] | None):
                 A list of extractors to pull the shape data from. If None, get the list of
                 cached extractors from the session manager.
             replace (bool): If True, will clear the current uv's from the view before adding anything new.

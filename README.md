@@ -11,7 +11,7 @@ Note: UViewSD is NOT an editor, there is no way to edit and save out uv tweaks w
 
 1. UV Set name.
     - This option box will be made up of the avaiable uv names in the current mesh selection.
-        - See [PrimDataExtractor](./uviewsd/shape.py) for more information on how these names are discovered.
+        - See [PrimDataExtractor](./uviewsd/extractors.py) for more information on how these names are discovered.
     - Changing the active uv set will change it for all selected meshes in the view. So if a shape doesn't contain the specific uv set selected, nothing will be displayed for that shape.
 2. UV Borders.
     - Toggle the thick line on/off for the UV edge borders.

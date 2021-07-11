@@ -2,7 +2,7 @@
 # This file is part of UViewSD, and is released under the "MIT License Agreement".
 # Please see the LICENSE file that should have been included as part of this package.
 from uviewsd import shape
-from PIL import Image
+from uviewsd import extractors
 
 import os
 import logging
@@ -28,7 +28,7 @@ class SessionManager:
         """Return a list of the extractors for all the prims that have been added in the session.
 
         Returns:
-            list[shape.PrimDataExtractor]: List of extractors.
+            list[extractors.PrimDataExtractor]: List of extractors.
         """
         return self._extractors
 
@@ -62,7 +62,7 @@ class SessionManager:
             primPaths (list[str]): List of prim paths to get from the active stage.
             replace (bool): If true, remove any of the current cached extractors.
         Returns
-            list[shape.PrimDataExtractor]:
+            list[extractors.PrimDataExtractor]:
                 List of any new uv extractors and list of any new texture extractors.
         """
         stage = self.activeStage()
@@ -79,7 +79,7 @@ class SessionManager:
             prims (Usd.Prim): List of prims to get from the stage.
             replace (bool): If true, remove any of the current cached extractors.
         Returns
-            list[shape.PrimDataExtractor]:
+            list[extractors.PrimDataExtractor]:
                 List of any new uv extractors and list of any new texture extractors.
         """
         if replace:
@@ -104,7 +104,7 @@ class SessionManager:
             uvSetName (str | None):
                 The uv set name to use to search for uv data in the extractors. If None is specified
                 falls back on the sessions active uv set name.
-            extractors (shape.PrimDataExtractor | None):
+            extractors (extractors.PrimDataExtractor | None):
                 The extractors to get the shape data from. If no extractors are specified
                 falls back on the cached extractors.
         Returns:
@@ -136,7 +136,7 @@ class SessionManager:
         Args:
             prim (Usd.Prim): The usd prim to update the cached extractors with.
         Returns:
-            list[shape.PrimDataExtractor]:
+            list[extractors.PrimDataExtractor]:
                 List of any new extractors added to the session manager.
         """
         newExtractor = None
@@ -145,7 +145,7 @@ class SessionManager:
             if prim == extractor.prim():
                 break
         else:
-            newExtractor = shape.PrimDataExtractor(prim)
+            newExtractor = extractors.PrimDataExtractor(prim)
             if not newExtractor.isValid():
                 newExtractor = None
                 logger.info("Invalid prim %s to extract data from.", prim)
