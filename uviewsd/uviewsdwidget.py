@@ -3,6 +3,7 @@
 # Please see the LICENSE file that should have been included as part of this package.
 from uviewsd import sessionmanager
 from uviewsd import viewerwidget
+from uviewsd import shape
 
 from PySide2 import QtWidgets, QtCore
 
@@ -25,6 +26,7 @@ class UViewSDWidget(QtWidgets.QWidget):
         self._uvDataLabelToggleButton = None
         self._uvSetNameComboBox = None
         self._texturePathComboBox = None
+        self._textureLoadButton = None
         self._textureDisplayToggleButton = None
         self._textureRepeatToggleButton = None
 
@@ -129,6 +131,13 @@ class UViewSDWidget(QtWidgets.QWidget):
         layout.addWidget(textureLabel)
         layout.addWidget(self._texturePathComboBox)
 
+        self._textureLoadButton = QtWidgets.QPushButton()
+        self._textureLoadButton.setIcon(
+            self.style().standardIcon(getattr(QtWidgets.QStyle, "SP_DirOpenIcon"))
+        )
+        self._textureLoadButton.setFixedSize(25, 25)
+        layout.addWidget(self._textureLoadButton)
+
         spacerLine = QtWidgets.QFrame()
         spacerLine.setFrameShape(QtWidgets.QFrame.VLine)
         spacerLine.setFrameShadow(QtWidgets.QFrame.Sunken)
@@ -157,10 +166,12 @@ class UViewSDWidget(QtWidgets.QWidget):
         # Combo boxes
         if self._uvSetNameComboBox:
             self._uvSetNameComboBox.currentIndexChanged.connect(
-                self.onUVSetNameSelected
+                self._onUVSetNameSelected
             )
         if self._texturePathComboBox:
-            self._texturePathComboBox.currentIndexChanged.connect(self.onTextureToggled)
+            self._texturePathComboBox.currentIndexChanged.connect(
+                self._onTextureSelected
+            )
 
         # Toggle buttons
         if self._gridToggleButton:
@@ -181,15 +192,18 @@ class UViewSDWidget(QtWidgets.QWidget):
             )
 
         if self._textureDisplayToggleButton:
-            self._textureDisplayToggleButton.clicked.connect(self.onTextureToggled)
+            self._textureDisplayToggleButton.clicked.connect(self._onTextureToggled)
         if self._textureRepeatToggleButton:
             self._textureRepeatToggleButton.clicked.connect(
-                lambda: self._view.setTextureRepeat(self._textureRepeatToggleButton.isChecked())
+                lambda: self._view.setTextureRepeat(
+                    self._textureRepeatToggleButton.isChecked()
+                )
             )
+        if self._textureLoadButton:
+            self._textureLoadButton.clicked.connect(self._openTexturePrompt)
 
     def keyPressEvent(self, event):
         self._view.keyPressEvent(event)
-        QtWidgets.QMainWindow.keyPressEvent(self, event)
 
     # UV SET
     def setUVSetName(self, name):
@@ -215,7 +229,7 @@ class UViewSDWidget(QtWidgets.QWidget):
                         self._uvSetNameComboBox.setCurrentIndex(indexToSet)
                     finally:
                         self._uvSetNameComboBox.blockSignals(False)
-            self.updateView(replace=True)
+            self.updateUVs(replace=True)
 
     def _updateUvSetNameOptions(self):
         """Update the uv set name combo box."""
@@ -247,7 +261,7 @@ class UViewSDWidget(QtWidgets.QWidget):
         finally:
             self._uvSetNameComboBox.blockSignals(False)
 
-    def onUVSetNameSelected(self):
+    def _onUVSetNameSelected(self):
         """Triggered from user selection of the uv set name.
 
         If the new selection is not what is already in use, clear the view and
@@ -258,7 +272,7 @@ class UViewSDWidget(QtWidgets.QWidget):
         uvSetName = self._uvSetNameComboBox.currentText()
         changed = self._sessionManager.setActiveUVSetName(uvSetName)
         if changed:
-            self.updateView(replace=True)
+            self.updateUVs(replace=True)
 
     # TEXTURES
     def setTexturePath(self, path, enable=True):
@@ -283,13 +297,19 @@ class UViewSDWidget(QtWidgets.QWidget):
 
     def _updateTextureOptions(self):
         """Update the texture path combo box."""
+        activeTexturePath = self._sessionManager.activeTexturePath()
         availableTexturePaths = self._sessionManager.availableTexturePaths()
         recentTexturePaths = self._sessionManager.recentTexturePaths()
+        if (
+            activeTexturePath in availableTexturePaths
+            and activeTexturePath in recentTexturePaths
+        ):
+            availableTexturePaths.remove(activeTexturePath)
+
         allPaths = recentTexturePaths + availableTexturePaths
         if len(allPaths) == 0 and self._texturePathComboBox.count() == 0:
             return
 
-        activeTexturePath = self._sessionManager.activeTexturePath()
         indexToSet = (
             allPaths.index(activeTexturePath)
             if allPaths and activeTexturePath
@@ -299,8 +319,12 @@ class UViewSDWidget(QtWidgets.QWidget):
         try:
             self._texturePathComboBox.blockSignals(True)
             self._texturePathComboBox.clear()
+
             for path in allPaths:
                 self._texturePathComboBox.addItem(path)
+            if recentTexturePaths and availableTexturePaths:
+                self._texturePathComboBox.insertSeparator(len(recentTexturePaths))
+
             if indexToSet is not None:
                 self._texturePathComboBox.setCurrentIndex(indexToSet)
             else:
@@ -309,22 +333,33 @@ class UViewSDWidget(QtWidgets.QWidget):
         finally:
             self._texturePathComboBox.blockSignals(False)
 
-    def onTextureToggled(self):
-        """
-        Triggered from user selection of the texture path, or a user togglging texture visibility.
-        If the new selection is not what is already in use, set the new texture
-        shape in the view.
-        """
+    def _onTextureSelected(self):
+        """Triggered from user selecting a texture path from the combo box."""
+        path = self._texturePathComboBox.currentText()
+        if not path:
+            return
+
+        success = self._sessionManager.setActiveTexturePath(path)
+        if success:
+            self._updateTextureOptions()
+            self.updateTexture()
+
+    def _onTextureToggled(self):
+        """Triggered from user toggling texture visibility."""
         textureEnabled = self._textureDisplayToggleButton.isChecked()
         self._view.setTextureVisible(textureEnabled)
         if not textureEnabled:
             return
+        self.updateTexture()
 
-        path = self._texturePathComboBox.currentText()
-        if path:
-            success = self._sessionManager.setActiveTexturePath(path)
-            if success:
-                self.updateTexture()
+    def _openTexturePrompt(self):
+        extensions = shape.PrimDataExtractor.VALID_IMAGE_EXTENSIONS
+        filterString = "Image (*" + " *".join(extensions) + ")"
+        fileToLoad = QtWidgets.QFileDialog.getOpenFileName(
+            self, "Load Image", filter=filterString
+        )
+        if fileToLoad:
+            self.setTexturePath(fileToLoad[0], enable=True)
 
     # VIEWER MANAGEMENT
     def setStage(self, stage):
@@ -344,7 +379,7 @@ class UViewSDWidget(QtWidgets.QWidget):
         if extractors or replace:
             self._updateUvSetNameOptions()
             self._updateTextureOptions()
-            self.updateView(extractors=extractors, replace=replace)
+            self.updateUVs(extractors=extractors, replace=replace)
 
     def addPrims(self, prims, replace=False):
         """Add a list of usd prims to the viewer.
@@ -357,9 +392,9 @@ class UViewSDWidget(QtWidgets.QWidget):
         if extractors or replace:
             self._updateUvSetNameOptions()
             self._updateTextureOptions()
-            self.updateView(extractors=extractors, replace=replace)
+            self.updateUVs(extractors=extractors, replace=replace)
 
-    def updateView(self, uvSetName=None, extractors=None, replace=False):
+    def updateUVs(self, uvSetName=None, extractors=None, replace=False):
         """Update the view with new shape data.
 
         Args:
@@ -394,7 +429,7 @@ class UViewSDWidget(QtWidgets.QWidget):
         self._view.clear()
         self._updateUvSetNameOptions()
         self._updateTextureOptions()
-        self.updateView()
+        self.updateUVs()
 
     def clear(self):
         """Clear the viewer of any uvs currently drawn on the screen."""

@@ -153,6 +153,12 @@ class TextureShader(BaseShader):
         return self._boundTexturePath
 
     def bindTexture(self, path):
+        """Bind an image file to use for the shaders texture.
+
+        Args:
+            path (str):
+                The file path for the texture image to bind to the shader.
+        """
         if path == self._boundTexturePath:
             return
         self._boundTexturePath = path

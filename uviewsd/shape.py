@@ -3,7 +3,6 @@
 # Please see the LICENSE file that should have been included as part of this package.
 from ctypes import c_void_p
 from OpenGL import GL
-from numpy.core.fromnumeric import repeat
 from pxr import UsdGeom, UsdShade, Sdf
 import numpy as np
 
@@ -270,7 +269,7 @@ class PrimDataExtractor:
                 os.path.isfile(path)
                 and os.path.splitext(path)[-1] in cls.VALID_IMAGE_EXTENSIONS
             ):
-                paths.append(path)
+                paths.append(os.path.abspath(path))
         return paths
 
 
@@ -500,11 +499,25 @@ class TextureShape:
         self._update = False
 
     def setTexturePath(self, path):
+        """
+        Set the file path to use for the texture being displayed,
+        will be updated on the next draw call.
+
+        Args:
+            path (str):
+                The file path for the texture image to use.
+        """
         if path != self._shader.texturePath():
             self._texturePath = path
             self._update = True
 
     def setTextureRepeat(self, textureRepeat):
+        """Set the repeat state of the texture, will be updated on the next draw call.
+
+        textureRepeat (bool):
+                If True, draw the plane/texture on every 1 by 1 unit used by the Grid class.
+                If False, the plane/texture will only be drawn on the (0, 0) to (1, 1) units.
+        """
         if textureRepeat != self._textureRepeat:
             self._textureRepeat = textureRepeat
             self._update = True
@@ -517,7 +530,7 @@ class TextureShape:
         """
         if self._vao is None:
             self.initializeGLData()
-        if self._update:
+        elif self._update:
             self.updateGLData()
         if not self._shader.valid():
             return
@@ -525,12 +538,8 @@ class TextureShape:
         self._shader.use()
         self._shader.setMatrix4f("viewMatrix", projectionMatrix)
 
-        if not self._vao:
-            self.initializeGLData()
-
         GL.glBindVertexArray(self._vao)
         GL.glDrawElements(GL.GL_TRIANGLES, self._numVerts, GL.GL_UNSIGNED_INT, None)
-
         GL.glBindVertexArray(0)
 
 
