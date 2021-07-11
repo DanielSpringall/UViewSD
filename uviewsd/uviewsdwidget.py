@@ -24,8 +24,9 @@ class UViewSDWidget(QtWidgets.QWidget):
         self._uvBorderHighlightToggleButton = None
         self._uvDataLabelToggleButton = None
         self._uvSetNameComboBox = None
-        self._textureDisplayToggleButton = None
         self._texturePathComboBox = None
+        self._textureDisplayToggleButton = None
+        self._textureRepeatToggleButton = None
 
         # Initialise UI
         QtWidgets.QWidget.__init__(self, parent=parent)
@@ -125,10 +126,13 @@ class UViewSDWidget(QtWidgets.QWidget):
         self._texturePathComboBox.setSizePolicy(
             QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
         )
+        layout.addWidget(textureLabel)
+        layout.addWidget(self._texturePathComboBox)
 
         spacerLine = QtWidgets.QFrame()
         spacerLine.setFrameShape(QtWidgets.QFrame.VLine)
         spacerLine.setFrameShadow(QtWidgets.QFrame.Sunken)
+        layout.addWidget(spacerLine)
 
         self._textureDisplayToggleButton = QtWidgets.QCheckBox()
         self._textureDisplayToggleButton.setText("Display Texture")
@@ -136,11 +140,17 @@ class UViewSDWidget(QtWidgets.QWidget):
             "Enable/disable display of texture."
         )
         self._textureDisplayToggleButton.setChecked(self._view._showTexture)
-
-        layout.addWidget(textureLabel)
-        layout.addWidget(self._texturePathComboBox)
-        layout.addWidget(spacerLine)
         layout.addWidget(self._textureDisplayToggleButton)
+
+        if self._config.enableTextureRepeatToggle:
+            self._textureRepeatToggleButton = QtWidgets.QCheckBox()
+            self._textureRepeatToggleButton.setText("Repeat")
+            self._textureRepeatToggleButton.setToolTip(
+                "Enable/disable repeat of the texture on the grid."
+            )
+            self._textureRepeatToggleButton.setChecked(self._config.textureRepeat)
+            layout.addWidget(self._textureRepeatToggleButton)
+
         return layout
 
     def _setupConnections(self):
@@ -150,9 +160,7 @@ class UViewSDWidget(QtWidgets.QWidget):
                 self.onUVSetNameSelected
             )
         if self._texturePathComboBox:
-            self._texturePathComboBox.currentIndexChanged.connect(
-                self.onTexturePathSelected
-            )
+            self._texturePathComboBox.currentIndexChanged.connect(self.onTextureToggled)
 
         # Toggle buttons
         if self._gridToggleButton:
@@ -173,10 +181,10 @@ class UViewSDWidget(QtWidgets.QWidget):
             )
 
         if self._textureDisplayToggleButton:
-            self._textureDisplayToggleButton.clicked.connect(
-                lambda: self._view.setTextureVisible(
-                    self._textureDisplayToggleButton.isChecked()
-                )
+            self._textureDisplayToggleButton.clicked.connect(self.onTextureToggled)
+        if self._textureRepeatToggleButton:
+            self._textureRepeatToggleButton.clicked.connect(
+                lambda: self._view.setTextureRepeat(self._textureRepeatToggleButton.isChecked())
             )
 
     def keyPressEvent(self, event):
@@ -253,38 +261,47 @@ class UViewSDWidget(QtWidgets.QWidget):
             self.updateView(replace=True)
 
     # TEXTURES
-    def setTexturePath(self, path, enable=False):
-        """Programatically set a texture path to be selected in the teture path combo box.
+    def setTexturePath(self, path, enable=True):
+        """
+        Programatically set a texture path to be selected in the teture path combo box.
         If the texture display is currently active, the texture will be displayed in the view.
+
         Args:
             path (str): The texture path to add.
             enable (bool): If true, ensure the texture display is enabled to view the texture.
         """
-        changed = self._sessionManager.setActiveTexturePath(path)
-        if not changed and not enable:
+        succesful = self._sessionManager.setActiveTexturePath(path)
+        if not succesful:
             return
+        self._updateTextureOptions()
 
-        # TODO: Actually create the texture shape.
         if enable:
             self._textureDisplayToggleButton.setChecked(True)
-        self.onTexturePathSelected()
+            self._view.setTextureVisible(True)
+        if self._textureDisplayToggleButton.isChecked():
+            self.updateTexture()
 
     def _updateTextureOptions(self):
         """Update the texture path combo box."""
         availableTexturePaths = self._sessionManager.availableTexturePaths()
         recentTexturePaths = self._sessionManager.recentTexturePaths()
         allPaths = recentTexturePaths + availableTexturePaths
-        if not allPaths and self._texturePathComboBox.count() == 0:
+        if len(allPaths) == 0 and self._texturePathComboBox.count() == 0:
             return
+
         activeTexturePath = self._sessionManager.activeTexturePath()
-        indexToSet = allPaths.item(activeTexturePath) if activeTexturePath else None
+        indexToSet = (
+            allPaths.index(activeTexturePath)
+            if allPaths and activeTexturePath
+            else None
+        )
 
         try:
             self._texturePathComboBox.blockSignals(True)
             self._texturePathComboBox.clear()
             for path in allPaths:
                 self._texturePathComboBox.addItem(path)
-            if indexToSet:
+            if indexToSet is not None:
                 self._texturePathComboBox.setCurrentIndex(indexToSet)
             else:
                 self._texturePathComboBox.insertItem(0, "")
@@ -292,16 +309,22 @@ class UViewSDWidget(QtWidgets.QWidget):
         finally:
             self._texturePathComboBox.blockSignals(False)
 
-    def onTexturePathSelected(self):
+    def onTextureToggled(self):
         """
-        Triggered from user selection of the texture path.
+        Triggered from user selection of the texture path, or a user togglging texture visibility.
         If the new selection is not what is already in use, set the new texture
         shape in the view.
         """
+        textureEnabled = self._textureDisplayToggleButton.isChecked()
+        self._view.setTextureVisible(textureEnabled)
+        if not textureEnabled:
+            return
+
         path = self._texturePathComboBox.currentText()
-        changed = self._sessionManager.setActiveTexturePath(path)
-        if changed:
-            self.updateTexture()
+        if path:
+            success = self._sessionManager.setActiveTexturePath(path)
+            if success:
+                self.updateTexture()
 
     # VIEWER MANAGEMENT
     def setStage(self, stage):
@@ -360,8 +383,11 @@ class UViewSDWidget(QtWidgets.QWidget):
             path (str | None):
                 The texture path to use. If None, get the active texture path from the session manager.
         """
-        textureShape = self._sessionManager.getTextureShape(path)
-        self._view.setTextureShape(textureShape)
+        pathToSet = path if path else self._sessionManager.activeTexturePath()
+        if not pathToSet:
+            logger.debug("No texture path to set.")
+            return
+        self._view.setTexturePath(pathToSet)
 
     def refreshView(self):
         """Refresh the viewer with the current cache extractors and uvName."""
@@ -390,7 +416,9 @@ class UIConfiguration(viewerwidget.ViewerConfiguration):
         self.enableUVBorderToggle = True
         self.enableGridToggle = True
         self.enableUVPositionToggle = True
+
         self.enableTextureDisplayToggle = True
+        self.enableTextureRepeatToggle = True
 
     @property
     def showViewerController(self):

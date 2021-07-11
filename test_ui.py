@@ -35,9 +35,12 @@ def run():
     # stage = Usd.Stage.Open("C:\\Users\\Daniel\\Projects\\Python\\UViewSD\\uviewsd\\tests\\data\\uvborders.usda")
     # primPaths = ['/cube']
 
+    # texturePath = "C:\\Libraries\\USD\\share\\usd\\Attic_NVIDIA\\Materials\\PreviewSurfaceTextures\\block_mat_inst_BaseColor.png"
+
     _window = uviewsdwidget.UViewSDWidget(stage)
-    _window.addPrimPaths(primPaths)
     _window.show()
+    _window.addPrimPaths(primPaths)
+    # _window.setTexturePath(texturePath)
 
     app.exec_()
 

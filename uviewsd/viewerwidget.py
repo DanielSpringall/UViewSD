@@ -34,6 +34,7 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
 
         config = config if config is not None else ViewerConfiguration()
         self._showTexture = config.displayTexture
+        self._textureRepeat = config.textureRepeat
         self._showGrid = config.displayGrid
         self._showUVEdgeBoundaryHighlight = config.displayUVBorder
         self._showCurrentMouseUVPosition = config.displayUVPos
@@ -83,14 +84,14 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
         if shapesRemoved and update:
             self.update()
 
-    def setTextureShape(self, shape):
-        """Set the shape used to draw the texture map in the view.
+    def setTexturePath(self, path):
+        """Set the file path used for the texture map in the view.
 
         Args:
-            shape (shape.TextureShape | None):
-                The shape to draw for the texture, or None if you want to remove the current one.
+            path (str):
+                The file path to get the image for the texture.
         """
-        self._textureShape = shape
+        self._textureShape.setTexturePath(path)
         if self._showTexture:
             self.update()
 
@@ -136,9 +137,14 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
         visible = bool(visible)
         if self._showTexture != visible:
             self._showTexture = visible
-            # Only need to do an update if an actual texture shape exists.
-            if self._textureShape:
-                self.update()
+            self.update()
+
+    def setTextureRepeat(self, repeat):
+        repeat = bool(repeat)
+        if self._textureRepeat != repeat:
+            self._textureRepeat = repeat
+            self._textureShape.setTextureRepeat(repeat)
+            self.update()
 
     def focusOnBBox(self):
         """Focus the viewer on the bbox surounding all the currently displayed shapes."""
@@ -218,7 +224,10 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
         self._backgroundGrid = shape.Grid()
         self._camera = camera.Camera2D(self.width(), self.height())
         self._lineShader = shader.LineShader()
-        self._textureShader = shader.TextureShader()
+        self._textureShape = shape.TextureShape(
+            shader=shader.TextureShader(),
+            textureRepeat=self._textureRepeat,
+        )
         self._painter = QtGui.QPainter()
 
         self._gridNumbersFont = QtGui.QFont()
@@ -242,9 +251,7 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
         projectionMatrix = self._camera.glProjectionMatrix()
 
         # Draw texture
-        if self._showTexture and self._textureShape:
-            self._textureShader.use()
-            self._textureShader.setMatrix4f("viewMatrix", projectionMatrix)
+        if self._showTexture:
             self._textureShape.draw(projectionMatrix)
 
         # Setup the shader used for both the grid and uv shapes.
@@ -257,7 +264,9 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
 
         # Draw UVs
         for _shape in self._shapes:
-            _shape.draw(self._lineShader, drawBoundaries=self._showUVEdgeBoundaryHighlight)
+            _shape.draw(
+                self._lineShader, drawBoundaries=self._showUVEdgeBoundaryHighlight
+            )
         self._painter.endNativePainting()
 
         # Draw text
@@ -335,3 +344,4 @@ class ViewerConfiguration:
         self.displayGrid = True
         self.displayUVBorder = False
         self.displayUVPos = False
+        self.textureRepeat = False

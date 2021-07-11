@@ -3,9 +3,9 @@
 # Please see the LICENSE file that should have been included as part of this package.
 from ctypes import c_void_p
 from OpenGL import GL
+from numpy.core.fromnumeric import repeat
 from pxr import UsdGeom, UsdShade, Sdf
 import numpy as np
-from PIL import Image
 
 import os
 import logging
@@ -266,7 +266,10 @@ class PrimDataExtractor:
             if not isinstance(attribute, Sdf.AssetPath):
                 continue
             path = attribute.resolvedPath
-            if os.path.isfile(path) and os.path.splitext(path)[-1] in cls.VALID_IMAGE_EXTENSIONS:
+            if (
+                os.path.isfile(path)
+                and os.path.splitext(path)[-1] in cls.VALID_IMAGE_EXTENSIONS
+            ):
                 paths.append(path)
         return paths
 
@@ -380,7 +383,7 @@ class UVShape:
         GL.glBindBuffer(GL.GL_ARRAY_BUFFER, 0)
         GL.glBindVertexArray(0)
 
-    def draw(self, shader, drawBoundaries=False, **kwargs):
+    def draw(self, shader, drawBoundaries=False):
         """OpenGl draw call.
 
         Args:
@@ -409,70 +412,124 @@ class UVShape:
 
 
 class TextureShape:
-    def __init__(self, path):
-        numGridUnits = Grid.NUM_GRIDS_FROM_ORIGIN
-        self._positions = np.array(
-            [
-                -numGridUnits, -numGridUnits,
-                -numGridUnits,  numGridUnits,
-                 numGridUnits, -numGridUnits,
-                 numGridUnits, -numGridUnits,
-                 numGridUnits,  numGridUnits,
-                -numGridUnits,  numGridUnits,
-            ],
-            dtype=np.float32
-        )
-        image = Image.open(path)
-        self._imageData = np.array(list(image.getdata()), np.uint8)
-
-    def initializeGLData(self, lineData, color):
-        """Initialize the OpenGL data for a given set of line data.
+    def __init__(self, shader, textureRepeat=False):
+        """OpenGl class for drawing plane with a given texture.
 
         Args:
-            lineData (np.array): Array of vertex positions for lines.
-            color (tuple(int, int, int)): Color made up of RGB values to draw the lines with.
-        Returns:
-            dict{vao: int, numVerts: int, color: tuple(int, int, int)}:
-                OpenGL data used to draw the lines with.
+            shader (shader.TextureShader):
+                The texture shader to use for the draw call.
+            textureRepeat (bool):
+                If True, draw the plane/texture on every 1 by 1 unit used by the Grid class.
+                If False, the plane/texture will only be drawn on the (0, 0) to (1, 1) units.
         """
-        vao = GL.glGenVertexArrays(1)
-        pbo = GL.glGenBuffers(1)
+        self._shader = shader
+        self._texturePath = shader.texturePath()
+        self._textureRepeat = textureRepeat
+        self._update = True
 
-        GL.glBindVertexArray(vao)
-        GL.glBindBuffer(GL.GL_ARRAY_BUFFER, pbo)
+        self._positions = self._positionData()
+        self._indices = np.array((0, 1, 2, 2, 3, 1), dtype=np.int32)
+        self._numVerts = self._indices.size
 
-        GL.glEnableVertexAttribArray(0)
-        GL.glVertexAttribPointer(0, 2, GL.GL_FLOAT, GL.GL_FALSE, 0, c_void_p(0))
+        self._vao = None
 
-        GL.glBufferData(
-            GL.GL_ARRAY_BUFFER, lineData.nbytes, lineData, GL.GL_STATIC_DRAW
+    def _positionData(self):
+        """Get the position data of the vertices used for the texture plane."""
+        max = Grid.NUM_GRIDS_FROM_ORIGIN if self._textureRepeat else 1.0
+        min = -max if self._textureRepeat else 0.0
+        return np.array(
+            ((min, min), (min, max), (max, min), (max, max)),
+            dtype=np.float32,
         )
+
+    def identifier(self):
+        return self._shader.texturePath()
+
+    def initializeGLData(self):
+        self._vao = GL.glGenVertexArrays(1)
+        [self._vbo, ebo] = GL.glGenBuffers(2)
+
+        GL.glBindVertexArray(self._vao)
+        # Positions
+        GL.glBindBuffer(GL.GL_ARRAY_BUFFER, self._vbo)
+        GL.glBufferData(
+            GL.GL_ARRAY_BUFFER,
+            self._positions.nbytes,
+            self._positions,
+            GL.GL_STATIC_DRAW,
+        )
+        # Indices
+        GL.glBindBuffer(GL.GL_ELEMENT_ARRAY_BUFFER, ebo)
+        GL.glBufferData(
+            GL.GL_ELEMENT_ARRAY_BUFFER,
+            self._indices.nbytes,
+            self._indices.flatten(),
+            GL.GL_STATIC_DRAW,
+        )
+
+        GL.glVertexAttribPointer(0, 2, GL.GL_FLOAT, GL.GL_FALSE, 0, c_void_p(0))
+        GL.glEnableVertexAttribArray(0)
 
         GL.glBindBuffer(GL.GL_ARRAY_BUFFER, 0)
         GL.glBindVertexArray(0)
 
-        data = {"vao": vao, "numVerts": int(len(lineData) / 2), "color": color}
-        return data
+        if self._texturePath is not None:
+            self._shader.bindTexture(self._texturePath)
 
-    def draw(self, shader, drawBoundaries=False, **kwargs):
+        self._update = False
+
+    def updateGLData(self):
+        """Update the texture used in the shader, and the plane size."""
+        if (
+            self._texturePath is not None
+            and self._texturePath != self._shader.texturePath()
+        ):
+            self._shader.bindTexture(self._texturePath)
+
+        if self._positions[0][0] != 0.0 or self._textureRepeat:
+            self._positions = self._positionData()
+            GL.glBindVertexArray(self._vao)
+            GL.glBindBuffer(GL.GL_ARRAY_BUFFER, self._vbo)
+            GL.glBufferData(
+                GL.GL_ARRAY_BUFFER,
+                self._positions.nbytes,
+                self._positions,
+                GL.GL_STATIC_DRAW,
+            )
+
+        self._update = False
+
+    def setTexturePath(self, path):
+        if path != self._shader.texturePath():
+            self._texturePath = path
+            self._update = True
+
+    def setTextureRepeat(self, textureRepeat):
+        if textureRepeat != self._textureRepeat:
+            self._textureRepeat = textureRepeat
+            self._update = True
+
+    def draw(self, projectionMatrix):
         """OpenGl draw call.
 
         Args:
-            shader (uviewsd.shader): The shader to use for the draw call. Assumed to already be set as in use.
-            drawBoundaries (bool): If true, draw the uv edge boundary highlights.
+            projectionMatrix (float[16]): Projection matrix to set the shader with.
         """
+        if self._vao is None:
+            self.initializeGLData()
+        if self._update:
+            self.updateGLData()
+        if not self._shader.valid():
+            return
+
+        self._shader.use()
+        self._shader.setMatrix4f("viewMatrix", projectionMatrix)
+
         if not self._vao:
             self.initializeGLData()
 
         GL.glBindVertexArray(self._vao)
-        GL.glDrawElements(GL.GL_, self._numUVs, GL.GL_UNSIGNED_INT, None)
-
-        if drawBoundaries:
-            GL.glLineWidth(3.0)
-            GL.glBindVertexArray(self._bao)
-            GL.glDrawElements(
-                GL.GL_LINES, self._numBoundaryUVs, GL.GL_UNSIGNED_INT, None
-            )
+        GL.glDrawElements(GL.GL_TRIANGLES, self._numVerts, GL.GL_UNSIGNED_INT, None)
 
         GL.glBindVertexArray(0)
 
@@ -561,7 +618,7 @@ class Grid:
         data = {"vao": vao, "numVerts": int(len(lineData) / 2), "color": color}
         return data
 
-    def draw(self, shader, **kwargs):
+    def draw(self, shader):
         """OpenGl draw call.
 
         Args:

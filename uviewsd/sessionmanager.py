@@ -213,13 +213,6 @@ class SessionManager:
         return True
 
     # TEXTURE
-    def getTextureSHape(self, path):
-        if path is None:
-            path = self.activeTexturePath()
-            if path is None:
-                return None
-        return shape.TextureShape(path)
-
     def _updateAvailableTexturePaths(self):
         """Update the available texture paths from the cached extractors.
         Tests to make sure the paths are valid file paths.
@@ -233,7 +226,7 @@ class SessionManager:
 
     def availableTexturePaths(self):
         """Return a list of the available texture paths.
-        
+
         Returns:
             list[str]: Alphabetically ordered list of available texture paths.
         """
@@ -260,11 +253,11 @@ class SessionManager:
         Args:
             path (str): The texture path to add.
         Returns
-            bool: True if change occured, false otherwise.
+            bool: True if succesfully set, false otherwise.
         """
         path = os.path.abspath(path)
         if path == self._activeTexturePath:
-            return False
+            return True
         if path not in self._availableTexturePaths:
             if not os.path.isfile(path):
                 logger.error("Invalid texture file path to set %s", path)
@@ -274,5 +267,12 @@ class SessionManager:
         if path in self._recentTexturePaths:
             self._recentTexturePaths.remove(path)
         self._recentTexturePaths.insert(0, path)
+
+        maxRecentTexturePathsTracked = 5
+        if len(self._recentTexturePaths) > maxRecentTexturePathsTracked:
+            self._recentTexturePaths = self._recentTexturePaths[
+                :maxRecentTexturePathsTracked
+            ]
+
         self._activeTexturePath = path
         return True
