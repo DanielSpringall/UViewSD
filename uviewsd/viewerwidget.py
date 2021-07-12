@@ -42,6 +42,9 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
         self.setMouseTracking(self._showCurrentMouseUVPosition)
         self.setMinimumSize(400, 400)
 
+    def __del__(self):
+        self.cleanupGL()
+
     # SHAPE MANAGEMENT
     def addShapes(self, shapes):
         """Add a list of shapes to be drawn in the scene and refresh the view.
@@ -234,6 +237,15 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
         self._gridNumbersFont.setPointSize(8)
         self._uvInfoFont = QtGui.QFont()
         self._uvInfoFont.setPointSize(12)
+
+    def _cleanupGL(self):
+        """Delete the various GL resources that have been created for the view."""
+        self.makeCurrent()
+        del self._backgroundGrid
+        del self._textureShape
+        del self._shapes
+        del self._lineShader
+        self.doneCurrent()
 
     def resizeGL(self, width, height):
         """Resize the GL viewport and update the camera with the new dimensions."""
