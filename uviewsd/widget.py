@@ -1,9 +1,9 @@
 # Copyright 2021 by Daniel Springall.
 # This file is part of UViewSD, and is released under the "MIT License Agreement".
 # Please see the LICENSE file that should have been included as part of this package.
-from uviewsd import sessionmanager
-from uviewsd import viewerwidget
-from uviewsd import extractors
+from uviewsd.core import sessionmanager as uc_sessionmanager
+from uviewsd.core import usdextractor as uc_usdextractor
+from uviewsd.ui import uvviewerwidget as ui_uvviewerwidget
 
 from PySide2 import QtWidgets, QtCore
 
@@ -12,12 +12,40 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class UViewSDWidget(QtWidgets.QWidget):
-    """Main widget holding the viewer and its corresponding configuration elements."""
-
+class UViewSDWindow(QtWidgets.QMainWindow):
     def __init__(self, stage=None, config=None, parent=None):
+        """Simple window wrapper for the UViewSDWidget."""
+        QtWidgets.QMainWindow.__init__(self, parent=parent)
+
+        self._view = UViewSDWidget(stage=stage, config=config, parent=self)
+        self.setCentralWidget(self._view)
+        self.setWindowTitle("UViewSD")
+
+    def view(self):
+        return self._view
+
+    def setStage(self, stage):
+        self._view.setStage(stage)
+
+    def addPrimPaths(self, primPaths, replace=False):
+        self._view.addPrimPaths(primPaths=primPaths, replace=replace)
+
+    def addPrims(self, prims, replace=False):
+        self._view.addPrims(prims=prims, replace=replace)
+
+    def refresh(self):
+        self._view.refresh()
+
+
+class UViewSDWidget(QtWidgets.QWidget):
+    def __init__(self, stage=None, config=None, parent=None):
+        """Main widget holding the uv viewer and its corresponding configuration elements."""
+        if config is not None and not isinstance(config, Config):
+            raise ValueError("Invalid config file passed to UViewSDWidget.")
+        self._config = config if config else Config()
+
         # Scene management
-        self._sessionManager = sessionmanager.SessionManager(stage)
+        self._sessionManager = uc_sessionmanager.SessionManager(stage)
 
         # UI objects
         self._view = None
@@ -29,11 +57,11 @@ class UViewSDWidget(QtWidgets.QWidget):
         self._textureLoadButton = None
         self._textureDisplayToggleButton = None
         self._textureRepeatToggleButton = None
+        # If the toolbar isn't enabled we need to track the enable/disable state of the uv edge borders
+        self._displayUVBorder = self._config.displayUVBorder
 
         # Initialise UI
         QtWidgets.QWidget.__init__(self, parent=parent)
-        self._config = config if config else UIConfiguration()
-        self.setWindowTitle("UViewSD")
         self._setupUI()
         self._setupConnections()
         self._view.setFocus()
@@ -44,7 +72,7 @@ class UViewSDWidget(QtWidgets.QWidget):
         layout.setContentsMargins(3, 3, 3, 3)
         layout.setSpacing(3)
 
-        self._view = viewerwidget.UVViewerWidget(config=self._config, parent=self)
+        self._view = ui_uvviewerwidget.UVViewerWidget(config=self._config, parent=self)
 
         if self._config.showViewerController:
             layout.addLayout(self._setupViewerControlLayout())
@@ -86,7 +114,7 @@ class UViewSDWidget(QtWidgets.QWidget):
         if self._config.enableUVBorderToggle:
             self._uvBorderHighlightToggleButton = QtWidgets.QCheckBox()
             self._uvBorderHighlightToggleButton.setText("UV Border")
-            self._uvBorderHighlightToggleButton.setChecked(self._config.displayUVBorder)
+            self._uvBorderHighlightToggleButton.setChecked(self._displayUVBorder)
             toolTip = "Enable/disable highlight of uv boundary edges."
             self._uvBorderHighlightToggleButton.setToolTip(toolTip)
             layout.addWidget(self._uvBorderHighlightToggleButton)
@@ -178,16 +206,16 @@ class UViewSDWidget(QtWidgets.QWidget):
             self._gridToggleButton.clicked.connect(
                 lambda: self._view.setGridVisibility(self._gridToggleButton.isChecked())
             )
-        if self._uvBorderHighlightToggleButton:
-            self._uvBorderHighlightToggleButton.clicked.connect(
-                lambda: self._view.setUVEdgeBoundaryHighlight(
-                    self._uvBorderHighlightToggleButton.isChecked()
-                )
-            )
         if self._uvDataLabelToggleButton:
             self._uvDataLabelToggleButton.clicked.connect(
                 lambda: self._view.setMouseUVPositionDisplay(
                     self._uvDataLabelToggleButton.isChecked()
+                )
+            )
+        if self._uvBorderHighlightToggleButton:
+            self._uvBorderHighlightToggleButton.clicked.connect(
+                lambda: self.displayUVBorders(
+                    self._uvBorderHighlightToggleButton.isChecked()
                 )
             )
 
@@ -349,7 +377,7 @@ class UViewSDWidget(QtWidgets.QWidget):
         self.updateTexture()
 
     def _openTexturePrompt(self):
-        extensions = extractors.VALID_IMAGE_EXTENSIONS
+        extensions = uc_usdextractor.VALID_IMAGE_EXTENSIONS
         filterString = "Image (*" + " *".join(extensions) + ")"
         fileToLoad = QtWidgets.QFileDialog.getOpenFileName(
             self, "Load Image", filter=filterString
@@ -362,7 +390,7 @@ class UViewSDWidget(QtWidgets.QWidget):
         """Set a new stage and update reset the viewer."""
         changed = self._sessionManager.setStage(stage)
         if changed:
-            self.refreshView()
+            self.refresh()
 
     def addPrimPaths(self, primPaths, replace=False):
         """Add a given list of prim paths to the viewer.
@@ -396,7 +424,7 @@ class UViewSDWidget(QtWidgets.QWidget):
         Args:
             uvSetName (str | None):
                 The uv set name to use. If None, get the active uv set name from the session manager.
-            extractors (list[extractors.PrimDataExtractor] | None):
+            extractors (list[uc_usdextractor.PrimDataExtractor] | None):
                 A list of extractors to pull the shape data from. If None, get the list of
                 cached extractors from the session manager.
             replace (bool): If True, will clear the current uv's from the view before adding anything new.
@@ -404,8 +432,34 @@ class UViewSDWidget(QtWidgets.QWidget):
         if replace:
             self._view.clear()
         shapeData = self._sessionManager.getShapeData(uvSetName, extractors)
+        if self._displayUVBorder:
+            shapeData.extend(
+                self._sessionManager.getShapeEdgeBorderData(uvSetName, extractors)
+            )
         if shapeData:
             self._view.addShapes(shapeData)
+
+    def displayUVBorders(self, display):
+        """Set the display of uv border edges in the viewer."""
+        display = bool(display)
+        if display == self._displayUVBorder:
+            return
+
+        if display:
+            shapeData = self._sessionManager.getShapeEdgeBorderData()
+            if shapeData:
+                self._view.addShapes(shapeData)
+        else:
+            shapesToRemove = []
+            for shape in self._view.shapes():
+                identifier = shape.identifier()
+                if identifier.endswith(
+                    self._sessionManager.EDGE_BORDER_IDENTIFIER_SUFFIX
+                ):
+                    shapesToRemove.append(identifier)
+            if shapesToRemove:
+                self._view.removeShapes(shapesToRemove)
+        self._displayUVBorder = display
 
     def updateTexture(self, path=None):
         """Update the texture used in the view.
@@ -420,9 +474,10 @@ class UViewSDWidget(QtWidgets.QWidget):
             return
         self._view.setTexturePath(pathToSet)
 
-    def refreshView(self):
+    def refresh(self):
         """Refresh the viewer with the current cache extractors and uvName."""
         self._view.clear()
+        self._sessionManager.refresh()
         self._updateUvSetNameOptions()
         self._updateTextureOptions()
         self.updateUVs()
@@ -433,16 +488,12 @@ class UViewSDWidget(QtWidgets.QWidget):
         self._view.clear()
 
 
-class UIConfiguration(viewerwidget.ViewerConfiguration):
-    """Class containing configuration for the UI layout and viewer setup."""
-
+class Config:
     def __init__(self):
-        viewerwidget.ViewerConfiguration.__init__(self)
-
-        # Overall toggle for any sort of user input configuration
+        # Global toggle for enabling/disabling the entire viewer configuration toolbar
         self.enableUserSettingOptions = True
 
-        # Individual UI element configuration
+        # Individual UI element configuration visibility
         self.enableUVSetNameOption = True
         self.enableUVBorderToggle = True
         self.enableGridToggle = True
@@ -450,6 +501,13 @@ class UIConfiguration(viewerwidget.ViewerConfiguration):
 
         self.enableTextureDisplayToggle = True
         self.enableTextureRepeatToggle = True
+
+        # Initial viewer configuration
+        self.displayGrid = True
+        self.displayUVPos = False
+        self.displayUVBorder = False
+        self.displayTexture = False
+        self.textureRepeat = False
 
     @property
     def showViewerController(self):

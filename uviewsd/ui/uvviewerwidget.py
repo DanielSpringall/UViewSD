@@ -1,10 +1,10 @@
 # Copyright 2021 by Daniel Springall.
 # This file is part of UViewSD, and is released under the "MIT License Agreement".
 # Please see the LICENSE file that should have been included as part of this package.
-from uviewsd import shape
-from uviewsd import states
-from uviewsd import camera
-from uviewsd import shader
+from uviewsd.gl import shape as gl_shape
+from uviewsd.gl import camera as gl_camera
+from uviewsd.gl import shader as gl_shader
+from uviewsd.ui import states as ui_states
 
 from PySide2 import QtWidgets, QtGui, QtCore
 from OpenGL import GL
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class UVViewerWidget(QtWidgets.QOpenGLWidget):
     """Widget responsible for drawing the GL elements."""
 
-    def __init__(self, config=None, parent=None):
+    def __init__(self, config, parent=None):
         QtWidgets.QOpenGLWidget.__init__(self, parent=parent)
 
         self._painter = None
@@ -32,11 +32,9 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
         self._camera = None
         self._lineShader = None
 
-        config = config if config is not None else ViewerConfiguration()
         self._showTexture = config.displayTexture
         self._textureRepeat = config.textureRepeat
         self._showGrid = config.displayGrid
-        self._showUVEdgeBoundaryHighlight = config.displayUVBorder
         self._showCurrentMouseUVPosition = config.displayUVPos
 
         self.setMouseTracking(self._showCurrentMouseUVPosition)
@@ -46,12 +44,16 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
         self._cleanupGL()
 
     # SHAPE MANAGEMENT
+    def shapes(self):
+        """Return the list of shapes in use in the viewer."""
+        return self._shapes
+
     def addShapes(self, shapes):
         """Add a list of shapes to be drawn in the scene and refresh the view.
         Existing shapes with the same name will be overridden.
 
         Args:
-            shapes (list[shape.UVShape]): List of shapes to draw.
+            shapes (list[gl_shape.EdgesShape]): List of shapes to draw.
         """
         shapeNamesToAdd = [shape.identifier for shape in shapes]
         currentShapeNames = [shape.identifier for shape in self._shapes]
@@ -128,15 +130,8 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
             self.setMouseTracking(visible)
             self.update()
 
-    def setUVEdgeBoundaryHighlight(self, visible):
-        """Set the display of uv edge boundary highlights."""
-        visible = bool(visible)
-        if self._showUVEdgeBoundaryHighlight != visible:
-            self._showUVEdgeBoundaryHighlight = visible
-            self.update()
-
     def setTextureVisible(self, visible):
-        """Set the visible state of the texture shape."""
+        """Set the visible state of the texture gl_shape."""
         visible = bool(visible)
         if self._showTexture != visible:
             self._showTexture = visible
@@ -150,7 +145,7 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
             self.update()
 
     def focusOnBBox(self):
-        """Focus the viewer on the bbox surounding all the currently displayed shapes."""
+        """Focus the viewer on the bbox surrounding all the currently displayed shapes."""
         if not self._shapes:
             self._camera.focus(0.0, 1.0, 1.0, 0.0)
         else:
@@ -159,7 +154,7 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
                 if bbox is None:
                     bbox = _shape.bbox()
                 else:
-                    bbox.updateWithBBox(_shape.bbox())
+                    bbox.addAABBox(_shape.bbox())
             self._camera.focus(bbox.xMin, bbox.xMax, bbox.yMax, bbox.yMin)
         self.update()
 
@@ -189,7 +184,7 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
     def mousePressEvent(self, event):
         """Override to add custom state handling."""
         if not self._activeState:
-            state = states.stateFromEvent(event)
+            state = ui_states.stateFromEvent(event)
             if state:
                 self._activeState = state(
                     event, self._camera, self.width(), self.height()
@@ -224,11 +219,11 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
     # GL EVENTS
     def initializeGL(self):
         """Setup GL objects for the view ready for drawing."""
-        self._backgroundGrid = shape.Grid()
-        self._camera = camera.Camera2D(self.width(), self.height())
-        self._lineShader = shader.LineShader()
-        self._textureShape = shape.TextureShape(
-            shader=shader.TextureShader(),
+        self._backgroundGrid = gl_shape.Grid()
+        self._camera = gl_camera.Camera2D(self.width(), self.height())
+        self._lineShader = gl_shader.LineShader()
+        self._textureShape = gl_shape.TextureShape(
+            shader=gl_shader.TextureShader(),
             textureRepeat=self._textureRepeat,
         )
         self._painter = QtGui.QPainter()
@@ -240,12 +235,12 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
 
     def _cleanupGL(self):
         """Delete the various GL resources that have been created for the view."""
-        self.makeCurrent()
+        # self.makeCurrent()
         del self._backgroundGrid
         del self._textureShape
         del self._shapes
         del self._lineShader
-        self.doneCurrent()
+        # self.doneCurrent()
 
     def resizeGL(self, width, height):
         """Resize the GL viewport and update the camera with the new dimensions."""
@@ -276,9 +271,7 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
 
         # Draw UVs
         for _shape in self._shapes:
-            _shape.draw(
-                self._lineShader, drawBoundaries=self._showUVEdgeBoundaryHighlight
-            )
+            _shape.draw(self._lineShader)
         self._painter.endNativePainting()
 
         # Draw text
@@ -346,14 +339,3 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
             QtCore.Qt.AlignLeft | QtCore.Qt.AlignBottom,
             displayString,
         )
-
-
-class ViewerConfiguration:
-    """Class containing configuration for the viewer."""
-
-    def __init__(self):
-        self.displayTexture = False
-        self.displayGrid = True
-        self.displayUVBorder = False
-        self.displayUVPos = False
-        self.textureRepeat = False

@@ -1,16 +1,15 @@
 # Copyright 2021 by Daniel Springall.
 # This file is part of UViewSD, and is released under the "MIT License Agreement".
 # Please see the LICENSE file that should have been included as part of this package.
-from uviewsd import camera
+from uviewsd.gl import camera as gl_camera
+from uviewsd.tests import common as ut_common
 
-import unittest
 
-
-class CameraTestCase(unittest.TestCase):
+class CameraTestCase(ut_common.CommonTestCast):
     def setUp(self):
         self.initialWidth = 100
         self.initialHeight = 100
-        self.camera = camera.Camera2D(self.initialWidth, self.initialHeight)
+        self.camera = gl_camera.Camera2D(self.initialWidth, self.initialHeight)
 
     def _assertFocusRegion(self, expectedRegion):
         self._assertListsAlmostEqual(self.camera.getFocusRegion(), expectedRegion)
@@ -97,4 +96,6 @@ class CameraTestCase(unittest.TestCase):
 
 
 if __name__ == "__main__":
+    import unittest
+
     unittest.main()

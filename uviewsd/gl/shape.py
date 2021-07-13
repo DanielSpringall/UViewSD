@@ -1,7 +1,7 @@
 # Copyright 2021 by Daniel Springall.
 # This file is part of UViewSD, and is released under the "MIT License Agreement".
 # Please see the LICENSE file that should have been included as part of this package.
-from uviewsd import extractors
+from uviewsd.gl import utils as ug_utils
 
 from ctypes import c_void_p
 from OpenGL import GL
@@ -12,23 +12,24 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class UVShape:
-    def __init__(self, positions, indices, identifier):
+class EdgesShape:
+    def __init__(self, positions, indices, identifier, width=1.0):
         """OpenGl class for drawing uv edges.
 
         Args:
-            positions (list[float]):
-                A flat list of uv positions. e.g. [uvPos0.u, uvPos0.v, uvPos1.u, uvPose1.v, ...]
+            positions (list[tuple(int, int)]):
+                A list of tuples corresponding to a positions x and y values.
             indices (list[tuple(int, int)]):
                 A list of tuples corresponding to an edges start and end index . e.g. [(uvPos0, uvPos1), (uvPos1, uvPos2), ...]
                 where each index maps back to the uv positions. So uvPos0 -> uvPos1 would make up an edge.
+            width (float):
+                The line width to set for the edges.
         """
         self._positions = np.array(positions, dtype=np.float32)
         self._indices = np.array(indices, dtype=np.int)
         self._numUVs = self._indices.flatten().size
         self._identifier = identifier
-        self._boundaryIndices = None
-        self._numBoundaryUVs = None
+        self._lineWidth = width
 
         self._color = (1.0, 1.0, 1.0)
         self._vao = None
@@ -39,21 +40,21 @@ class UVShape:
         return self._identifier
 
     def bbox(self):
-        """Calculate the bounding box from the uv positions.
+        """Calculate the bounding box of the shape.
 
         Returns:
-            BBox: The bbox surounding the uv positions.
+            ug_utils.AABBox: The bbox of the shape.
         """
         if self._bbox is None:
             if self._numUVs <= 1:
                 return None
 
             edge = self._positions[self._indices[0]]
-            bbox = BBox(edge[0], edge[1])
+            bbox = ug_utils.AABBox(edge[0], edge[1])
             for i in range(1, int(self._numUVs / 2)):
                 edge = self._positions[self._indices[i]]
-                bbox.updateWithPosition(edge[0])
-                bbox.updateWithPosition(edge[1])
+                bbox.addPosition(edge[0])
+                bbox.addPosition(edge[1])
             self._bbox = bbox
 
         return self._bbox
@@ -86,65 +87,18 @@ class UVShape:
         GL.glBindBuffer(GL.GL_ARRAY_BUFFER, 0)
         GL.glBindVertexArray(0)
 
-    def initializeBoundaryGLData(self):
-        self._boundaryIndices = np.array(
-            extractors.PrimDataExtractor.edgeBoundariesFromEdgeIndices(self._indices),
-            dtype=np.int,
-        )
-        self._numBoundaryUVs = self._boundaryIndices.flatten().size
-
-        self._bao = GL.glGenVertexArrays(1)
-        [pbo, ebo] = GL.glGenBuffers(2)
-
-        GL.glBindVertexArray(self._bao)
-        # Positions
-        GL.glBindBuffer(GL.GL_ARRAY_BUFFER, pbo)
-        GL.glBufferData(
-            GL.GL_ARRAY_BUFFER,
-            self._positions.nbytes,
-            self._positions,
-            GL.GL_STATIC_DRAW,
-        )
-        # Indices
-        GL.glBindBuffer(GL.GL_ELEMENT_ARRAY_BUFFER, ebo)
-        GL.glBufferData(
-            GL.GL_ELEMENT_ARRAY_BUFFER,
-            self._boundaryIndices.nbytes,
-            self._boundaryIndices.flatten(),
-            GL.GL_STATIC_DRAW,
-        )
-
-        GL.glVertexAttribPointer(0, 2, GL.GL_FLOAT, GL.GL_FALSE, 0, c_void_p(0))
-        GL.glEnableVertexAttribArray(0)
-
-        GL.glBindBuffer(GL.GL_ARRAY_BUFFER, 0)
-        GL.glBindVertexArray(0)
-
-    def draw(self, shader, drawBoundaries=False):
+    def draw(self, shader):
         """OpenGl draw call.
 
         Args:
             shader (uviewsd.shader): The shader to use for the draw call. Assumed to already be set as in use.
-            drawBoundaries (bool): If true, draw the uv edge boundary highlights.
         """
         if not self._vao:
             self.initializeGLData()
-        if drawBoundaries and not self._bao:
-            self.initializeBoundaryGLData()
-
         shader.setVec3f("color", self._color)
-
-        GL.glLineWidth(1.0)
+        GL.glLineWidth(self._lineWidth)
         GL.glBindVertexArray(self._vao)
         GL.glDrawElements(GL.GL_LINES, self._numUVs, GL.GL_UNSIGNED_INT, None)
-
-        if drawBoundaries:
-            GL.glLineWidth(3.0)
-            GL.glBindVertexArray(self._bao)
-            GL.glDrawElements(
-                GL.GL_LINES, self._numBoundaryUVs, GL.GL_UNSIGNED_INT, None
-            )
-
         GL.glBindVertexArray(0)
 
 
@@ -385,41 +339,3 @@ class Grid:
             GL.glBindVertexArray(data["vao"])
             GL.glDrawArrays(GL.GL_LINES, 0, data["numVerts"])
             GL.glBindVertexArray(0)
-
-
-# UTILITIES
-class BBox:
-    def __init__(self, pos0, pos1):
-        if pos0[0] <= pos1[0]:
-            self.xMin = pos0[0]
-            self.xMax = pos1[0]
-        else:
-            self.xMin = pos1[0]
-            self.xMax = pos0[0]
-        if pos0[1] <= pos1[1]:
-            self.yMin = pos0[1]
-            self.yMax = pos1[1]
-        else:
-            self.yMin = pos1[1]
-            self.yMax = pos0[1]
-
-    def updateWithPosition(self, pos):
-        if self.xMin > pos[0]:
-            self.xMin = pos[0]
-        elif self.xMax < pos[0]:
-            self.xMax = pos[0]
-        if self.yMin > pos[1]:
-            self.yMin = pos[1]
-        elif self.yMax < pos[1]:
-            self.yMax = pos[1]
-
-    def updateWithBBox(self, otherBBox):
-        if self.xMin > otherBBox._xMin:
-            self.xMin = otherBBox._xMin
-        if self.xMax < otherBBox._xMax:
-            self.xMax = otherBBox._xMax
-        if self.yMin > otherBBox._yMin:
-            self.yMin = otherBBox._yMin
-        if self.yMax > otherBBox._yMax:
-
-            self.yMax = otherBBox._yMax

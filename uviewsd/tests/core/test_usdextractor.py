@@ -1,36 +1,23 @@
 # Copyright 2021 by Daniel Springall.
 # This file is part of UViewSD, and is released under the "MIT License Agreement".
 # Please see the LICENSE file that should have been included as part of this package.
-from uviewsd import extractors
-from pxr import Usd
-
-import unittest
-import os
+from uviewsd.core import usdextractor as uc_usdextractor
+from uviewsd.tests import common as ut_common
 
 
-USD_DATA_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data")
-
-
-class PrimDataExtractorTestCase(unittest.TestCase):
+class PrimDataExtractorTestCase(ut_common.CommonTestCast):
     def setUp(self):
         self._stage = None
 
-    def loadTestDataPrim(self, fileName):
-        filePath = os.path.join(USD_DATA_DIR, "{}.usda".format(fileName))
-        self._stage = Usd.Stage.Open(filePath)
-        prim = self._stage.GetPrimAtPath("/cube")
-        self.assertTrue(prim.IsValid())
-        return prim
-
     def test_invalidprim(self):
         prim = self.loadTestDataPrim("invalid")
-        extractor = extractors.PrimDataExtractor(prim)
+        extractor = uc_usdextractor.PrimDataExtractor(prim)
         self.assertFalse(extractor.isValid())
         self.assertEqual(extractor.validUVNames(), [])
 
     def test_uvsetname(self):
         prim = self.loadTestDataPrim("mulitpleuvnames")
-        extractor = extractors.PrimDataExtractor(prim)
+        extractor = uc_usdextractor.PrimDataExtractor(prim)
         self.assertTrue(extractor.isValid())
         self.assertEqual(extractor.prim(), prim)
 
@@ -42,7 +29,7 @@ class PrimDataExtractorTestCase(unittest.TestCase):
 
     def test_uvdata_facevarying(self):
         prim = self.loadTestDataPrim("facevarying")
-        extractor = extractors.PrimDataExtractor(prim)
+        extractor = uc_usdextractor.PrimDataExtractor(prim)
         self.assertTrue(extractor.isValid())
         uvName = "st"
         self.assertEqual(extractor.validUVNames(), [uvName])
@@ -66,36 +53,49 @@ class PrimDataExtractorTestCase(unittest.TestCase):
         expectedIndices = [
             (0, 1),
             (1, 3),
-            (3, 2),
-            (2, 0),
             (2, 3),
+            (0, 2),
             (3, 5),
-            (5, 4),
-            (4, 2),
             (4, 5),
+            (2, 4),
             (5, 7),
-            (7, 6),
-            (6, 4),
             (6, 7),
+            (4, 6),
             (7, 9),
-            (9, 8),
-            (8, 6),
+            (8, 9),
+            (6, 8),
             (1, 10),
             (10, 11),
-            (11, 3),
-            (3, 1),
-            (12, 0),
-            (0, 2),
+            (3, 11),
+            (0, 12),
             (2, 13),
-            (13, 12),
+            (12, 13),
         ]
-        [uvPositions, edgeIndices] = extractor.uvData(uvName)
-        self.assertEqual(expectedPositions, uvPositions)
-        self.assertEqual(expectedIndices, edgeIndices)
+        expectedBorderIndices = [
+            (0, 1),
+            (3, 5),
+            (2, 4),
+            (5, 7),
+            (4, 6),
+            (7, 9),
+            (8, 9),
+            (6, 8),
+            (1, 10),
+            (10, 11),
+            (3, 11),
+            (0, 12),
+            (2, 13),
+            (12, 13),
+        ]
+
+        uvData = extractor.data(uvName)
+        self.assertEqual(expectedPositions, uvData.positions())
+        self.assertEqual(expectedIndices, uvData.edgeIndices())
+        self.assertEqual(expectedBorderIndices, uvData.edgeBorderIndices())
 
     def test_uvdata_vertexvarying(self):
         prim = self.loadTestDataPrim("vertexvarying")
-        extractor = extractors.PrimDataExtractor(prim)
+        extractor = uc_usdextractor.PrimDataExtractor(prim)
         self.assertTrue(extractor.isValid())
         uvName = "st"
         self.assertEqual(extractor.validUVNames(), [uvName])
@@ -113,60 +113,26 @@ class PrimDataExtractorTestCase(unittest.TestCase):
         expectedIndices = [
             (0, 1),
             (1, 3),
-            (3, 2),
-            (2, 0),
             (2, 3),
-            (3, 5),
-            (5, 4),
-            (4, 2),
-            (4, 5),
-            (5, 7),
-            (7, 6),
-            (6, 4),
-            (1, 7),
-            (7, 5),
-            (5, 3),
-            (3, 1),
-            (6, 0),
             (0, 2),
-            (2, 4),
-            (4, 6),
-        ]
-        [uvPositions, edgeIndices] = extractor.uvData(uvName)
-        self.assertEqual(expectedPositions, uvPositions)
-        self.assertEqual(expectedIndices, edgeIndices)
-
-    def test_uvborder(self):
-        prim = self.loadTestDataPrim("uvborders")
-        extractor = extractors.PrimDataExtractor(prim)
-        self.assertTrue(extractor.isValid())
-        uvName = "st"
-        self.assertEqual(extractor.validUVNames(), [uvName])
-        [_, edgeIndices] = extractor.uvData(uvName)
-
-        expectedIndices = [
-            (0, 1),
-            (14, 18),
-            (16, 18),
-            (5, 7),
-            (4, 6),
-            (7, 9),
-            (8, 9),
-            (6, 8),
-            (1, 10),
-            (10, 11),
-            (3, 11),
-            (0, 12),
-            (2, 13),
-            (12, 13),
-            (14, 15),
             (3, 5),
-            (15, 16),
+            (4, 5),
             (2, 4),
+            (5, 7),
+            (6, 7),
+            (4, 6),
+            (1, 7),
+            (0, 6),
         ]
-        edgeIndices = extractor.edgeBoundariesFromEdgeIndices(edgeIndices)
-        self.assertEqual(expectedIndices, edgeIndices)
+        expectedBorderIndices = [(0, 1), (6, 7), (1, 7), (0, 6)]
+
+        uvData = extractor.data(uvName)
+        self.assertEqual(expectedPositions, uvData.positions())
+        self.assertEqual(expectedIndices, uvData.edgeIndices())
+        self.assertEqual(expectedBorderIndices, uvData.edgeBorderIndices())
 
 
 if __name__ == "__main__":
+    import unittest
+
     unittest.main()

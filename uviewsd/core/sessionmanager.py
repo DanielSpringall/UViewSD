@@ -1,8 +1,8 @@
 # Copyright 2021 by Daniel Springall.
 # This file is part of UViewSD, and is released under the "MIT License Agreement".
 # Please see the LICENSE file that should have been included as part of this package.
-from uviewsd import shape
-from uviewsd import extractors
+from uviewsd.core import usdextractor as uc_usdextractor
+from uviewsd.gl import shape as gl_shape
 
 import os
 import logging
@@ -11,8 +11,9 @@ logger = logging.getLogger(__name__)
 
 
 class SessionManager:
-    # List of favoured uv names to help deremine the active uv name if none was specified.
+    # List of favoured uv names to help determine the active uv name if none was specified.
     DEFAULT_UV_SET_NAMES = ["uv", "st"]
+    EDGE_BORDER_IDENTIFIER_SUFFIX = "_edgeBorders"
 
     def __init__(self, stage=None):
         self._stage = stage
@@ -28,9 +29,14 @@ class SessionManager:
         """Return a list of the extractors for all the prims that have been added in the session.
 
         Returns:
-            list[extractors.PrimDataExtractor]: List of extractors.
+            list[uc_usdextractor.PrimDataExtractor]: List of uc_usdextractor.
         """
         return self._extractors
+
+    def refresh(self):
+        """Reset any cached data."""
+        for extractor in self._extractors:
+            extractor.refresh()
 
     # USD
     def activeStage(self):
@@ -60,10 +66,10 @@ class SessionManager:
 
         Args:
             primPaths (list[str]): List of prim paths to get from the active stage.
-            replace (bool): If true, remove any of the current cached extractors.
+            replace (bool): If true, remove any of the current cached uc_usdextractor.
         Returns
-            list[extractors.PrimDataExtractor]:
-                List of any new uv extractors and list of any new texture extractors.
+            list[uc_usdextractor.PrimDataExtractor]:
+                List of any new uv extractors and list of any new texture uc_usdextractor.
         """
         stage = self.activeStage()
         if stage is None:
@@ -77,10 +83,10 @@ class SessionManager:
 
         Args:
             prims (Usd.Prim): List of prims to get from the stage.
-            replace (bool): If true, remove any of the current cached extractors.
+            replace (bool): If true, remove any of the current cached uc_usdextractor.
         Returns
-            list[extractors.PrimDataExtractor]:
-                List of any new uv extractors and list of any new texture extractors.
+            list[uc_usdextractor.PrimDataExtractor]:
+                List of any new uv extractors and list of any new texture uc_usdextractor.
         """
         if replace:
             self._extractors = []
@@ -98,18 +104,18 @@ class SessionManager:
         return newExtractors
 
     def getShapeData(self, uvSetName=None, extractors=None):
-        """Get the relevant shape data to pass to the uv viewer from a list of extractors.
+        """Get the relevant shape data to pass to the uv viewer.
 
         Args:
             uvSetName (str | None):
-                The uv set name to use to search for uv data in the extractors. If None is specified
+                The uv set name to use to search for uv data in the uc_usdextractor. If None is specified
                 falls back on the sessions active uv set name.
-            extractors (extractors.PrimDataExtractor | None):
+            extractors (uc_usdextractor.PrimDataExtractor | None):
                 The extractors to get the shape data from. If no extractors are specified
-                falls back on the cached extractors.
+                falls back on the cached uc_usdextractor.
         Returns:
-            list[shape.UVShape]:
-                List of UVShape objects for each current extractor.
+            list[gl_shape.EdgesShape]:
+                List of EdgesShape objects for each current extractor.
         """
         uvName = uvSetName if uvSetName else self.activeUVSetName()
         extractors = extractors if extractors else self._extractors
@@ -117,16 +123,66 @@ class SessionManager:
             return []
 
         shapeData = []
-        for extractor in extractors:
-            if not extractor.isUVNameValid(uvName):
-                continue
-            [positions, indices] = extractor.uvData(uvName)
-            if not (positions and indices):
-                continue
-
-            identifier = extractor.prim().GetPath().pathString
-            shapeData.append(shape.UVShape(positions, indices, identifier))
+        for uvData in self._iterUVDataFromName(uvName, extractors):
+            shape = gl_shape.EdgesShape(
+                uvData.positions(), uvData.edgeIndices(), uvData.identifier()
+            )
+            shapeData.append(shape)
         return shapeData
+
+    def getShapeEdgeBorderData(self, uvSetName=None, extractors=None):
+        """Get the relevant shape edge border data to pass to the uv viewer.
+
+        Args:
+            uvSetName (str | None):
+                The uv set name to use to search for uv data in the uc_usdextractor. If None is specified
+                falls back on the sessions active uv set name.
+            extractors (uc_usdextractor.PrimDataExtractor | None):
+                The extractors to get the shape data from. If no extractors are specified
+                falls back on the cached uc_usdextractor.
+        Returns:
+            list[gl_shape.EdgesShape]:
+                List of EdgesShape objects for each current extractor.
+        """
+        uvName = uvSetName if uvSetName else self.activeUVSetName()
+        extractors = extractors if extractors else self._extractors
+        if not (extractors and uvName):
+            return []
+
+        shapeData = []
+        for uvData in self._iterUVDataFromName(uvName, extractors):
+            edgeIndices = uvData.edgeBorderIndices()
+            if not edgeIndices:
+                continue
+            identifier = uvData.identifier() + self.EDGE_BORDER_IDENTIFIER_SUFFIX
+            shape = gl_shape.EdgesShape(
+                uvData.positions(), edgeIndices, identifier, width=2.0
+            )
+            shapeData.append(shape)
+        return shapeData
+
+    @staticmethod
+    def _iterUVDataFromName(name, extractors):
+        """Iterate over the uv data objects with a specific uv name in a given set of extractors.
+
+        Args:
+            name (str):
+                The uv set name to use to search for uv data in the uc_usdextractor.
+            extractors (uc_usdextractor.PrimDataExtractor):
+                The extractors to get the shape data from.
+        Yields:
+            UVData: The uvData objects.
+        """
+        if not (extractors and name):
+            return
+
+        for extractor in extractors:
+            if not extractor.isUVNameValid(name):
+                continue
+            data = extractor.data(name)
+            if data is None:
+                continue
+            yield data
 
     def _updateExtractors(self, prim):
         """
@@ -136,7 +192,7 @@ class SessionManager:
         Args:
             prim (Usd.Prim): The usd prim to update the cached extractors with.
         Returns:
-            list[extractors.PrimDataExtractor]:
+            list[uc_usdextractor.PrimDataExtractor]:
                 List of any new extractors added to the session manager.
         """
         newExtractor = None
@@ -145,7 +201,7 @@ class SessionManager:
             if prim == extractor.prim():
                 break
         else:
-            newExtractor = extractors.PrimDataExtractor(prim)
+            newExtractor = uc_usdextractor.PrimDataExtractor(prim)
             if not newExtractor.isValid():
                 newExtractor = None
                 logger.info("Invalid prim %s to extract data from.", prim)
@@ -155,12 +211,12 @@ class SessionManager:
         return newExtractor
 
     def clear(self):
-        """Remove any cached extractors."""
+        """Remove any cached uc_usdextractor."""
         self._extractors = []
 
     # UV SETS
     def _updateAvailableUVSetNames(self):
-        """Update the available uv set names from the cached extractors."""
+        """Update the available uv set names from the cached uc_usdextractor."""
         self._availableUVSetNames = []
         for extractor in self._extractors:
             for name in extractor.validUVNames():
@@ -180,7 +236,7 @@ class SessionManager:
 
     def activeUVSetName(self):
         """
-        Return the current active uv set name. If none is specified, first look for a matching defualt
+        Return the current active uv set name. If none is specified, first look for a matching default
         uv name. If none can be found return the first name from the available uv names.
 
         Returns:
@@ -214,12 +270,12 @@ class SessionManager:
 
     # TEXTURE
     def _updateAvailableTexturePaths(self):
-        """Update the available texture paths from the cached extractors.
+        """Update the available texture paths from the cached uc_usdextractor.
         Tests to make sure the paths are valid file paths.
         """
         paths = []
         for extractor in self._extractors:
-            paths.extend(extractor.textureData())
+            paths.extend(extractor.texturePaths())
         paths = list(set(paths))
         paths.sort()
         self._availableTexturePaths = paths

@@ -7,7 +7,7 @@ from pxr.Usdviewq.plugin import PluginContainer
 
 class UVViewerPluginContainer(PluginContainer):
     def registerPlugins(self, plugRegistry, usdviewApi):
-        self._windowModule = self.deferredImport("uviewsd.plugin.window")
+        self._windowModule = self.deferredImport("uviewsd.usdviewplugin.window")
         self._openWindow = plugRegistry.registerCommandPlugin(
             "UVViewerPluginContainer.launchWindow", "Viewer", self.launchWindow
         )

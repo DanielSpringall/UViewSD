@@ -1,4 +1,4 @@
-from uviewsd import uviewsdwidget
+from uviewsd.widget import UViewSDWindow
 
 from PySide2 import QtWidgets, QtCore
 
@@ -37,9 +37,9 @@ def run():
 
     # texturePath = "C:\\Libraries\\USD\\share\\usd\\Attic_NVIDIA\\Materials\\PreviewSurfaceTextures\\block_mat_inst_BaseColor.png"
 
-    _window = uviewsdwidget.UViewSDWidget(stage)
+    _window = UViewSDWindow(stage=stage)
     _window.show()
-    _window.addPrimPaths(primPaths)
+    _window.view().addPrimPaths(primPaths)
     # _window.setTexturePath(texturePath)
 
     app.exec_()
