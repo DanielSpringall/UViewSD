@@ -43,7 +43,7 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
         self.setMinimumSize(400, 400)
 
     def __del__(self):
-        self.cleanupGL()
+        self._cleanupGL()
 
     # SHAPE MANAGEMENT
     def addShapes(self, shapes):
