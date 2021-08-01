@@ -51,14 +51,17 @@ class SessionManager:
         """Set the active stage for the session.
 
         Args:
-            name (Usd.Stage): The usd stage to set.
+            name (Usd.Stage | None):
+                The usd stage to set. If None, will remove any cached data.
         Returns
-            bool: True if change occured, false otherwise.
+            bool: True if change occurred, false otherwise.
         """
         if stage == self._stage:
             logger.debug("Usd stage already set to %s.", stage)
             return False
         self._stage = stage
+        if self._stage is None:
+            self.clear()
         return True
 
     def addPrimPaths(self, primPaths, replace=False):
@@ -213,6 +216,10 @@ class SessionManager:
     def clear(self):
         """Remove any cached uc_usdextractor."""
         self._extractors = []
+        self._availableUVSetNames = []
+        self._activeUVSetName = None
+        self._availableTexturePaths = []
+        self._activeTexturePath = None
 
     # UV SETS
     def _updateAvailableUVSetNames(self):

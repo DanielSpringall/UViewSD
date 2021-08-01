@@ -1,6 +1,8 @@
 # Copyright 2021 by Daniel Springall.
 # This file is part of UViewSD, and is released under the "MIT License Agreement".
 # Please see the LICENSE file that should have been included as part of this package.
+import unittest
+
 from uviewsd.gl import camera as gl_camera
 from uviewsd.tests import common as ut_common
 
@@ -96,6 +98,4 @@ class CameraTestCase(ut_common.CommonTestCast):
 
 
 if __name__ == "__main__":
-    import unittest
-
     unittest.main()

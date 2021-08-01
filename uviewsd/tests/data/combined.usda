@@ -1,0 +1,51 @@
+#usda 1.0
+(
+)
+
+def Xform "facevarying"
+{
+    double3 xformOp:translate = (-1, -1, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+
+    def "cube" (
+        prepend references = @./facevarying.usda@
+    )
+    {
+    }
+}
+
+def Xform "multipleuvnames"
+{
+    double3 xformOp:translate = (1, 1, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+
+    def "cube" (
+        prepend references = @./multipleuvnames.usda@
+    )
+    {
+    }
+}
+
+def Xform "texture"
+{
+    double3 xformOp:translate = (-1, 1, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+
+    def "cube" (
+        prepend references = @./texture.usda@
+    )
+    {
+    }
+}
+
+def Xform "uvborders"
+{
+    double3 xformOp:translate = (1, -1, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+
+    def "cube" (
+        prepend references = @./uvborders.usda@
+    )
+    {
+    }
+}
