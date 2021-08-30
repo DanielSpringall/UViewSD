@@ -5,7 +5,7 @@ The viewer itself allows a user to view uv's of selected usd mesh prims. The use
 Note: UViewSD is NOT an editor, there is no way to edit and save out uv tweaks within the UI.
 
 ![UViewSD UI](./resources/uviewsd_ui.png)
-Example clock asset from [NVIDIA Attic](https://developer.nvidia.com/usd).
+Example asset `/root/thelab01/workbench_grp/electronics_turntable01_0001` from [USD-ALab](https://animallogic.com/usd-alab/).
 
 ## Configuration
 ![UViewSD Configuration](./resources/uviewsd_configuration.png)
