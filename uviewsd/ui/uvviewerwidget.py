@@ -235,12 +235,9 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
 
     def _cleanupGL(self):
         """Delete the various GL resources that have been created for the view."""
-        # self.makeCurrent()
-        del self._backgroundGrid
-        del self._textureShape
-        del self._shapes
-        del self._lineShader
-        # self.doneCurrent()
+        for glObject in [self._backgroundGrid, self._textureShape, self._shapes, self._lineShader]:
+            if glObject is not None:
+                del glObject
 
     def resizeGL(self, width, height):
         """Resize the GL viewport and update the camera with the new dimensions."""

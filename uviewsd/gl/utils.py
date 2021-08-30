@@ -41,11 +41,11 @@ class AABBox:
             other (AABBox):
                 The bounding box to add to the current bounding box.
         """
-        if self.xMin > other._xMin:
-            self.xMin = other._xMin
-        if self.xMax < other._xMax:
-            self.xMax = other._xMax
-        if self.yMin > other._yMin:
-            self.yMin = other._yMin
-        if self.yMax > other._yMax:
-            self.yMax = other._yMax
+        if self.xMin > other.xMin:
+            self.xMin = other.xMin
+        if self.xMax < other.xMax:
+            self.xMax = other.xMax
+        if self.yMin > other.yMin:
+            self.yMin = other.yMin
+        if self.yMax > other.yMax:
+            self.yMax = other.yMax

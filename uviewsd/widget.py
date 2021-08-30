@@ -12,33 +12,41 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class UViewSDWindow(QtWidgets.QMainWindow):
-    def __init__(self, stage=None, config=None, parent=None):
-        """Simple window wrapper for the UViewSDWidget."""
-        QtWidgets.QMainWindow.__init__(self, parent=parent)
+class Config:
+    def __init__(self):
+        # Global toggle for enabling/disabling the entire viewer configuration toolbar
+        self.enableUserSettingOptions = True
 
-        self._view = UViewSDWidget(stage=stage, config=config, parent=self)
-        self.setCentralWidget(self._view)
-        self.setWindowTitle("UViewSD")
+        # Individual UI element configuration visibility
+        self.enableUVSetNameOption = True
+        self.enableUVBorderToggle = True
+        self.enableGridToggle = True
+        self.enableUVPositionToggle = True
 
-    def view(self):
-        return self._view
+        self.enableTextureDisplayToggle = True
+        self.enableTextureRepeatToggle = True
 
-    def setStage(self, stage):
-        self._view.setStage(stage)
+        # Initial viewer configuration
+        self.displayGrid = True
+        self.displayUVPos = False
+        self.displayUVBorder = False
+        self.displayTexture = False
+        self.textureRepeat = False
 
-    def addPrimPaths(self, primPaths, replace=False):
-        self._view.addPrimPaths(primPaths=primPaths, replace=replace)
+    @property
+    def showViewerController(self):
+        return self.enableUserSettingOptions and any(
+            [
+                self.enableUVSetNameOption,
+                self.enableUVBorderToggle,
+                self.enableGridToggle,
+                self.enableUVPositionToggle,
+            ]
+        )
 
-    def addPrims(self, prims, replace=False):
-        self._view.addPrims(prims=prims, replace=replace)
 
-    def refresh(self):
-        self._view.refresh()
-
-
-class UViewSDWidget(QtWidgets.QWidget):
-    def __init__(self, stage=None, config=None, parent=None):
+class UViewSDMixin(QtCore.QObject):
+    def __init__(self, stage=None, config=None):
         """Main widget holding the uv viewer and its corresponding configuration elements."""
         if config is not None and not isinstance(config, Config):
             raise ValueError("Invalid config file passed to UViewSDWidget.")
@@ -48,6 +56,7 @@ class UViewSDWidget(QtWidgets.QWidget):
         self._sessionManager = uc_sessionmanager.SessionManager(stage)
 
         # UI objects
+        self._layout = None
         self._view = None
         self._gridToggleButton = None
         self._uvBorderHighlightToggleButton = None
@@ -61,26 +70,21 @@ class UViewSDWidget(QtWidgets.QWidget):
         self._displayUVBorder = self._config.displayUVBorder
 
         # Initialise UI
-        QtWidgets.QWidget.__init__(self, parent=parent)
         self._setupUI()
         self._setupConnections()
         self._view.setFocus()
 
     # UI
     def _setupUI(self):
-        layout = QtWidgets.QVBoxLayout()
-        layout.setContentsMargins(3, 3, 3, 3)
-        layout.setSpacing(3)
-
+        self._layout = QtWidgets.QVBoxLayout()
+        self._layout.setContentsMargins(3, 3, 3, 3)
+        self._layout.setSpacing(3)
         self._view = ui_uvviewerwidget.UVViewerWidget(config=self._config, parent=self)
-
         if self._config.showViewerController:
-            layout.addLayout(self._setupViewerControlLayout())
+            self._layout.addLayout(self._setupViewerControlLayout())
         if self._config.enableTextureDisplayToggle:
-            layout.addLayout(self._setupTextureControlLayout())
-        layout.addWidget(self._view)
-
-        self.setLayout(layout)
+            self._layout.addLayout(self._setupTextureControlLayout())
+        self._layout.addWidget(self._view)
 
     def _setupViewerControlLayout(self):
         """Create and return a layout containing uv set combo box/options."""
@@ -305,15 +309,15 @@ class UViewSDWidget(QtWidgets.QWidget):
     # TEXTURES
     def setTexturePath(self, path, enable=True):
         """
-        Programatically set a texture path to be selected in the teture path combo box.
+        Programatically set a texture path to be selected in the texture path combo box.
         If the texture display is currently active, the texture will be displayed in the view.
 
         Args:
             path (str): The texture path to add.
             enable (bool): If true, ensure the texture display is enabled to view the texture.
         """
-        succesful = self._sessionManager.setActiveTexturePath(path)
-        if not succesful:
+        successful = self._sessionManager.setActiveTexturePath(path)
+        if not successful:
             return
         self._updateTextureOptions()
 
@@ -488,34 +492,18 @@ class UViewSDWidget(QtWidgets.QWidget):
         self._view.clear()
 
 
-class Config:
-    def __init__(self):
-        # Global toggle for enabling/disabling the entire viewer configuration toolbar
-        self.enableUserSettingOptions = True
+class UViewSDWindow(QtWidgets.QMainWindow, UViewSDMixin):
+    def __init__(self, stage=None, config=None, parent=None):
+        QtWidgets.QMainWindow.__init__(self, parent=parent)
+        UViewSDMixin.__init__(self, stage=stage, config=config)
+        widget = QtWidgets.QWidget()
+        widget.setLayout(self._layout)
+        self.setCentralWidget(widget)
+        self.setWindowTitle("UViewSD")
 
-        # Individual UI element configuration visibility
-        self.enableUVSetNameOption = True
-        self.enableUVBorderToggle = True
-        self.enableGridToggle = True
-        self.enableUVPositionToggle = True
 
-        self.enableTextureDisplayToggle = True
-        self.enableTextureRepeatToggle = True
-
-        # Initial viewer configuration
-        self.displayGrid = True
-        self.displayUVPos = False
-        self.displayUVBorder = False
-        self.displayTexture = False
-        self.textureRepeat = False
-
-    @property
-    def showViewerController(self):
-        return self.enableUserSettingOptions and any(
-            [
-                self.enableUVSetNameOption,
-                self.enableUVBorderToggle,
-                self.enableGridToggle,
-                self.enableUVPositionToggle,
-            ]
-        )
+class UViewSDWidget(QtWidgets.QWidget, UViewSDMixin):
+    def __init__(self, stage=None, config=None, parent=None):
+        QtWidgets.QWidget.__init__(self, parent=parent)
+        UViewSDMixin.__init__(self, stage=stage, config=config)
+        self.setLayout(self._layout)

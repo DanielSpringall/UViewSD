@@ -21,6 +21,6 @@ class USDViewerUVWindow(UViewSDWindow):
     def selectionChanged(self, *args, **kwargs):
         selectedPaths = self._usdviewApi.selectedPaths
         if selectedPaths:
-            self.view().addPrimPaths(selectedPaths, replace=True)
+            self.addPrimPaths(selectedPaths, replace=True)
         else:
-            self.view().clear()
+            self.clear()

@@ -137,6 +137,7 @@ class PrimDataExtractor:
         if not (positions and indices):
             logger.debug("No uv data exists for %s on %s", uvName, self._mesh)
             self._uvData[uvName] = None
+            return None
 
         primPath = self.prim().GetPath().pathString
         uvData = UVData(uvName, primPath, positions, indices, borderIndices)
@@ -172,8 +173,14 @@ class PrimDataExtractor:
         """
         faceVertCountList = self._mesh.GetFaceVertexCountsAttr().Get()
         uvPositions = primvar.Get()
+        if len(uvPositions) == 0:
+            return None, None, None
+
         uvIndices = primvar.GetIndices()
-        edgeIndices, borderIndices = self._createUVEdges(faceVertCountList, [uvIndices])
+        if len(uvIndices) == 0:
+            edgeIndices, borderIndices = self._createUVEdgesFromPositions(faceVertCountList)
+        else:
+            edgeIndices, borderIndices = self._createUVEdges(faceVertCountList, [uvIndices])
         return uvPositions, edgeIndices, borderIndices
 
     def _getVertexVaryingUVs(self, primvar):
@@ -188,6 +195,9 @@ class PrimDataExtractor:
         faceVertCountList = self._mesh.GetFaceVertexCountsAttr().Get()
         faceVertexIndices = self._mesh.GetFaceVertexIndicesAttr().Get()
         uvPositions = primvar.Get()
+        if len(uvPositions) == 0:
+            return None, None, None
+
         uvIndices = primvar.GetIndices()
         uvIndexMaps = [faceVertexIndices]
         if uvIndices:
@@ -235,6 +245,36 @@ class PrimDataExtractor:
                 borderIndices.append(edge.indices())
 
         return edgeIndices, borderIndices
+
+    @staticmethod
+    def _createUVEdgesFromPositions(faceVertCountList):
+        """Generate the uv edge indices from the face indices.
+        This is done if no uvIndices exist.
+
+        Note: We could use the first uvPosition of an index and any subsequent matching
+              positions use this same index. But that assumes there are no uvs that
+              have the same position but different indices, which is entirely plausible.
+              So instead just build the entirety of the edge indices and return an empty border
+              indices as we won't be able to accurately determine borders.
+
+        Args:
+            faceVertCountList list[int]:
+                List of number of indices per face.
+        Returns:
+            list[tuple(int, int)], list[tuple(int, int)]:
+                UV edge indices, UV edge border indices.
+        """
+        consumedIndices = 0
+        edgeIndices = []
+        for faceVertCount in faceVertCountList:
+            for i in range(faceVertCount):
+                firstIndex = consumedIndices + i
+                secondIndex = (
+                    consumedIndices if i == (faceVertCount - 1) else firstIndex + 1
+                )
+                edgeIndices.append((firstIndex, secondIndex))
+            consumedIndices += faceVertCount
+        return edgeIndices, []
 
     # TEXTURE
     def texturePaths(self):
