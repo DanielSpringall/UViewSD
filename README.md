@@ -51,7 +51,7 @@ Setting up UViewSD for use in usdview is straight forward. Add the `/local/path/
 When the UI is open, upon selection in usdview, any selected meshes will be added to the UViewSD widget.
 
 ## DCC Applications
-There is no explicit setup currently for DCC applications, to create one you can use [UViewSDWindow/UViewSDWidget](https://github.com/DanielSpringall/UViewSD/blob/main/uviewsd/widget).
+There is no explicit setup currently for DCC applications, to create one you can use [UViewSDWindow/UViewSDWidget](https://github.com/DanielSpringall/UViewSD/blob/main/uviewsd/widget.py).
 For a minimum setup you will need to work out how to pass the usd stage to the window class, and how to pass the prim paths of the prims in the stage you want to view.
 You can look at an example of this in the [USDViewerUVWindow](https://github.com/DanielSpringall/UViewSD/blob/main/uviewsd/usdviewplugin/window.py).
 
