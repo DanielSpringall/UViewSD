@@ -12,9 +12,9 @@ class Camera2D:
             width (int): Screen width.
             height (int): Screen height.
         """
-        self._screenWidth = width
-        self._screenHeight = height
-        self._screenAspectRatio = width / height
+        self._screenWidth = float(width)
+        self._screenHeight = float(height)
+        self._screenAspectRatio = self._screenWidth / self._screenHeight
         # Cached focus region used to prevent jittering when consecutively calling resize. e.g. during user window resize.
         self._initResizeFocusRegion = None
         self._defaultBufferScale = 0.1
@@ -43,26 +43,26 @@ class Camera2D:
         if bufferScale is None:
             bufferScale = self._defaultBufferScale
 
-        width = right - left
-        height = top - bottom
+        width = float(right - left)
+        height = float(top - bottom)
         aspectRatio = width / height
 
         if self._screenAspectRatio >= aspectRatio:
             halfWidth = width / 2.0
-            xMid = left + halfWidth
-            scaledHalfWidth = abs(self._screenAspectRatio / aspectRatio * halfWidth)
+            xMid = float(left) + halfWidth
+            scaledHalfWidth = float(abs(self._screenAspectRatio / aspectRatio * halfWidth))
             left = xMid - scaledHalfWidth
             right = xMid + scaledHalfWidth
         else:
             halfHeight = height / 2.0
-            yMid = bottom + halfHeight
-            scaledHalfHeight = abs(aspectRatio / self._screenAspectRatio * halfHeight)
+            yMid = float(bottom) + halfHeight
+            scaledHalfHeight = float(abs(aspectRatio / self._screenAspectRatio * halfHeight))
             top = yMid + scaledHalfHeight
             bottom = yMid - scaledHalfHeight
 
         if bufferScale:
-            xBuffer = (right - left) * bufferScale
-            yBuffer = (top - bottom) * bufferScale
+            xBuffer = float(right - left) * bufferScale
+            yBuffer = float(top - bottom) * bufferScale
             left -= xBuffer
             right += xBuffer
             top += yBuffer
@@ -78,10 +78,10 @@ class Camera2D:
             tuple(float, float, float, float): Left, right, top, bottom values of the focus region.
         """
         projectionMat = self.projectionMatrix()
-        xScale = projectionMat[0][0]
-        yScale = projectionMat[1][1]
-        xTransform = projectionMat[0][3]
-        yTransform = projectionMat[1][3]
+        xScale = float(projectionMat[0][0])
+        yScale = float(projectionMat[1][1])
+        xTransform = float(projectionMat[0][3])
+        yTransform = float(projectionMat[1][3])
 
         left = -(1.0 + xTransform) / xScale
         right = (1.0 - xTransform) / xScale
@@ -112,8 +112,8 @@ class Camera2D:
             list[float, float]: The Qt mapped screen co-ordinate.
         """
         return [
-            (coord[0] / 2.0 + 0.5) * self._screenWidth,
-            (coord[1] / -2.0 + 0.5) * self._screenHeight,
+            (float(coord[0]) / 2.0 + 0.5) * self._screenWidth,
+            (float(coord[1]) / -2.0 + 0.5) * self._screenHeight,
         ]
 
     def mapScreenToGl(self, coord):
@@ -125,8 +125,8 @@ class Camera2D:
             list[float, float]: The GL mapped screen co-ordinate.
         """
         return [
-            coord[0] / self._screenWidth * 2.0 - 1.0,
-            (coord[1] / self._screenHeight - 0.5) * -2.0,
+            float(coord[0]) / self._screenWidth * 2.0 - 1.0,
+            (float(coord[1]) / self._screenHeight - 0.5) * -2.0,
         ]
 
     def mapScreenToWorld(self, coord):
@@ -184,11 +184,11 @@ class Camera2D:
             self._initResizeFocusRegion = self.getFocusRegion()
         [left, right, top, bottom] = self._initResizeFocusRegion
 
-        self._screenWidth = width
-        self._screenHeight = height
-        self._screenAspectRatio = width / height
+        self._screenWidth = float(width)
+        self._screenHeight = float(height)
+        self._screenAspectRatio = self._screenWidth / self._screenHeight
 
-        halfHeight = (top - bottom) / 2.0
+        halfHeight = float(top - bottom) / 2.0
         yMid = bottom + halfHeight
         scaledHalfHeight = halfHeight / self._screenAspectRatio
         bottom = yMid - scaledHalfHeight
@@ -222,7 +222,7 @@ class Camera2D:
         Return:
             float[16]: Flattened projection matrix.
         """
-        return np.matrix.flatten(np.matrix.transpose(self.projectionMatrix()))
+        return list(np.matrix.transpose(self.projectionMatrix()).flat)
 
     def scaleMatrixAroundPoint(
         self, matrix, xScale, yScale, coord, minScaleAmount=0.01
@@ -236,8 +236,8 @@ class Camera2D:
             coord (list[float, float]): The co-ordinate to scale the matrix around.
             minScaleAmount (float): The minimum scale allowed to help prevent flipping.
         """
-        currentXScale = matrix[0][0]
-        currentYScale = matrix[1][1]
+        currentXScale = float(matrix[0][0])
+        currentYScale = float(matrix[1][1])
         if (
             (xScale == 1.0 and yScale == 1.0)
             or currentXScale <= minScaleAmount
@@ -245,8 +245,8 @@ class Camera2D:
         ):
             return matrix
 
-        resultingXScale = currentXScale * xScale
-        resultingYScale = currentYScale * yScale
+        resultingXScale = currentXScale * float(xScale)
+        resultingYScale = currentYScale * float(yScale)
         if resultingXScale <= minScaleAmount or resultingYScale <= minScaleAmount:
             resultingXScale = minScaleAmount
             resultingYScale = minScaleAmount * self._screenAspectRatio
@@ -273,11 +273,11 @@ class Camera2D:
             top (float): The top unit in world space of the focus region.
             bottom (float): The bottom unit in world space of the focus region.
         """
-        xScale = 2.0 / (right - left)
-        yScale = 2.0 / (top - bottom)
+        xScale = 2.0 / float(right - left)
+        yScale = 2.0 / float(top - bottom)
 
-        xTransform = -((right + left) / (right - left))
-        yTransform = -((top + bottom) / (top - bottom))
+        xTransform = -(float(right + left) / float(right - left))
+        yTransform = -(float(top + bottom) / float(top - bottom))
 
         projectionMat = np.identity(4)
         projectionMat[0][0] = xScale

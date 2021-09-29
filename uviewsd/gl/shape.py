@@ -26,7 +26,7 @@ class EdgesShape:
                 The line width to set for the edges.
         """
         self._positions = np.array(positions, dtype=np.float32)
-        self._indices = np.array(indices, dtype=np.int)
+        self._indices = np.array(indices, dtype=np.uint32)
         self._numUVs = self._indices.flatten().size
         self._identifier = identifier
         self._lineWidth = width
@@ -249,7 +249,7 @@ class Grid:
         maxVal = self.NUM_GRIDS_FROM_ORIGIN
         minVal = -self.NUM_GRIDS_FROM_ORIGIN
         for i in range((self.TOTAL_LINES) * 2 + 1):
-            offset = i / self.LINE_INTERVALS
+            offset = i / float(self.LINE_INTERVALS)
             lineOffset = minVal + offset
             lineVerts = [
                 minVal,
