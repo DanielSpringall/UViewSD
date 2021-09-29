@@ -347,11 +347,20 @@ class PrimDataExtractor:
                 List of previously visited input nodes to compare against to ensure no
                 search recursion occurs. New inputs discovered will be added to this list.
         """
-        for connection in input.GetConnectedSources():
-            if not connection:
-                continue
-            for input in connection[0].source.GetInputs():
-                if input in inputsVisited:
+        if hasattr(input, "GetConnectedSources"):
+            for connection in input.GetConnectedSources():
+                if not connection:
                     continue
-                inputsVisited.append(input)
-                cls._getUpStreamInputs(input, inputsVisited)
+                for input in connection[0].source.GetInputs():
+                    if input in inputsVisited:
+                        continue
+                    inputsVisited.append(input)
+                    cls._getUpStreamInputs(input, inputsVisited)
+        else:
+            connection = input.GetConnectedSource()
+            if not connection:
+                return
+            for input in connection[0].GetInputs():
+                if input in inputsVisited:
+                    inputsVisited.append(input)
+                    cls._getUpStreamInputs(input, inputsVisited)
