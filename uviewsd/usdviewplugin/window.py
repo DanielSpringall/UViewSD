@@ -12,6 +12,7 @@ class USDViewerUVWindow(UViewSDWindow):
         usdviewApi.dataModel.selection.signalPrimSelectionChanged.connect(
             self.selectionChanged
         )
+        usdviewApi.dataModel.signalStageReplaced.connect(self.stageChanged)
 
         # Trigger the selection update call in case the user had something selected
         # before the window was opened.
@@ -24,3 +25,8 @@ class USDViewerUVWindow(UViewSDWindow):
             self.addPrimPaths(selectedPaths, replace=True)
         else:
             self.clear()
+
+    def stageChanged(self,  *args, **kwargs):
+        self.clear()
+        self.setStage(self._usdviewApi.stage)
+        self.selectionChanged()
