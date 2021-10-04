@@ -392,6 +392,7 @@ class UViewSDMixin(QtCore.QObject):
     # VIEWER MANAGEMENT
     def setStage(self, stage):
         """Set a new stage and update reset the viewer."""
+        self.clear()
         changed = self._sessionManager.setStage(stage)
         if changed:
             self.refresh()
