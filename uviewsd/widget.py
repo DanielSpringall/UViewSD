@@ -196,34 +196,34 @@ class UViewSDMixin(QtCore.QObject):
 
     def _setupConnections(self):
         # Combo boxes
-        if self._uvSetNameComboBox:
+        if self._uvSetNameComboBox is not None:
             self._uvSetNameComboBox.currentIndexChanged.connect(
                 self._onUVSetNameSelected
             )
-        if self._texturePathComboBox:
+        if self._texturePathComboBox is not None:
             self._texturePathComboBox.currentIndexChanged.connect(
                 self._onTextureSelected
             )
 
         # Toggle buttons
-        if self._gridToggleButton:
+        if self._gridToggleButton is not None:
             self._gridToggleButton.clicked.connect(
                 lambda: self._view.setGridVisibility(self._gridToggleButton.isChecked())
             )
-        if self._uvDataLabelToggleButton:
+        if self._uvDataLabelToggleButton is not None:
             self._uvDataLabelToggleButton.clicked.connect(
                 lambda: self._view.setMouseUVPositionDisplay(
                     self._uvDataLabelToggleButton.isChecked()
                 )
             )
-        if self._uvBorderHighlightToggleButton:
+        if self._uvBorderHighlightToggleButton is not None:
             self._uvBorderHighlightToggleButton.clicked.connect(
                 lambda: self.displayUVBorders(
                     self._uvBorderHighlightToggleButton.isChecked()
                 )
             )
 
-        if self._textureDisplayToggleButton:
+        if self._textureDisplayToggleButton is not None:
             self._textureDisplayToggleButton.clicked.connect(self._onTextureToggled)
         if self._textureRepeatToggleButton:
             self._textureRepeatToggleButton.clicked.connect(
@@ -231,7 +231,7 @@ class UViewSDMixin(QtCore.QObject):
                     self._textureRepeatToggleButton.isChecked()
                 )
             )
-        if self._textureLoadButton:
+        if self._textureLoadButton is not None:
             self._textureLoadButton.clicked.connect(self._openTexturePrompt)
 
     def keyPressEvent(self, event):
@@ -249,7 +249,7 @@ class UViewSDMixin(QtCore.QObject):
         """
         changed = self._sessionManager.setActiveUVSetName(name)
         if changed:
-            if self._uvSetNameComboBox:
+            if self._uvSetNameComboBox is not None:
                 indexToSet = self._uvSetNameComboBox.findText(name)
                 if indexToSet == -1:
                     logger.debug(
@@ -265,7 +265,7 @@ class UViewSDMixin(QtCore.QObject):
 
     def _updateUvSetNameOptions(self):
         """Update the uv set name combo box."""
-        if not self._uvSetNameComboBox:
+        if self._uvSetNameComboBox is None:
             return
         availableUVSetNames = self._sessionManager.availableUVSetNames()
         if not availableUVSetNames and self._uvSetNameComboBox.count() == 0:
@@ -299,7 +299,7 @@ class UViewSDMixin(QtCore.QObject):
         If the new selection is not what is already in use, clear the view and
         update it with the new uv set data.
         """
-        if not self._uvSetNameComboBox:
+        if self._uvSetNameComboBox is None:
             return
         uvSetName = self._uvSetNameComboBox.currentText()
         changed = self._sessionManager.setActiveUVSetName(uvSetName)
