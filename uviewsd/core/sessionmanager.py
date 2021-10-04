@@ -229,6 +229,9 @@ class SessionManager:
             for name in extractor.validUVNames():
                 if name not in self._availableUVSetNames:
                     self._availableUVSetNames.append(name)
+        if not self._availableUVSetNames:
+            self._activeUVSetName = None
+
         self._availableUVSetNames.sort()
 
     def availableUVSetNames(self):
