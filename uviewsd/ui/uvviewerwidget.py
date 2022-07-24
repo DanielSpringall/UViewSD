@@ -246,11 +246,11 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
 
     def paintGL(self):
         """Paint all the GL objects in the scene."""
-        self._painter.begin(self)
-
-        self._painter.beginNativePainting()
-        GL.glClearColor(*self._backgroundColor)
         GL.glClear(GL.GL_COLOR_BUFFER_BIT)
+        GL.glClearColor(*self._backgroundColor)
+
+        self._painter.begin(self)
+        self._painter.beginNativePainting()
 
         projectionMatrix = self._camera.glProjectionMatrix()
 
