@@ -329,6 +329,9 @@ class UViewSDMixin(QtCore.QObject):
 
     def _updateTextureOptions(self):
         """Update the texture path combo box."""
+        if self._texturePathComboBox is None:
+            return
+
         activeTexturePath = self._sessionManager.activeTexturePath()
         availableTexturePaths = self._sessionManager.availableTexturePaths()
         recentTexturePaths = self._sessionManager.recentTexturePaths()
