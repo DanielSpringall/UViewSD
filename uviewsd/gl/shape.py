@@ -242,6 +242,10 @@ class Grid:
 
     def __init__(self):
         """OpenGL class for drawing all the lines that make up the background grid for the uv viewer."""
+        self._lineData = None
+
+    def initializeGLData(self):
+        """Initialize the GL data for the lines. """
         incrementalLines = []
         unitLines = []
         originLines = []
@@ -276,22 +280,23 @@ class Grid:
         originColor = (0.0, 0.0, 1.0)
         uColor = (1.0, 0.0, 0.0)
         vColor = (1.0, 1.0, 0.0)
+
         self._lineData = [
-            self.initializeGLData(
+            self._buildGLLines(
                 np.array(incrementalLines, dtype=np.float32), color=incrementalColor
             ),
-            self.initializeGLData(
+            self._buildGLLines(
                 np.array(unitLines, dtype=np.float32), color=baseColor
             ),
-            self.initializeGLData(
+            self._buildGLLines(
                 np.array(originLines, dtype=np.float32), color=originColor
             ),
-            self.initializeGLData(np.array(uLine, dtype=np.float32), color=uColor),
-            self.initializeGLData(np.array(vLine, dtype=np.float32), color=vColor),
+            self._buildGLLines(np.array(uLine, dtype=np.float32), color=uColor),
+            self._buildGLLines(np.array(vLine, dtype=np.float32), color=vColor),
         ]
 
-    def initializeGLData(self, lineData, color):
-        """Initialize the OpenGL data for a given set of line data.
+    def _buildGLLines(self, lineData, color):
+        """Build a series of GL lines.
 
         Args:
             lineData (np.array): Array of vertex positions for lines.
@@ -325,6 +330,9 @@ class Grid:
         Args:
             shader (uviewsd.shader): The shader to use for the draw call. Assumed to already be set as in use.
         """
+        if self._lineData is None:
+            self.initializeGLData()
+
         GL.glLineWidth(1.0)
 
         previousColor = None

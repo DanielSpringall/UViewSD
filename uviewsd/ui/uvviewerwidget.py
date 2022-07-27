@@ -20,18 +20,19 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
     def __init__(self, config, parent=None):
         QtWidgets.QOpenGLWidget.__init__(self, parent=parent)
 
-        self._painter = None
-        self._uvInfoFont = None
-        self._gridNumbersFont = None
+        self._painter = QtGui.QPainter()
+        self._gridNumbersFont = QtGui.QFont()
+        self._gridNumbersFont.setPointSize(8)
+        self._uvInfoFont = QtGui.QFont()
+        self._uvInfoFont.setPointSize(12)
         self._backgroundColor = (0.3, 0.3, 0.3, 1.0)
 
+        self._backgroundGrid = gl_shape.Grid()
+        self._camera = gl_camera.Camera2D(self.width(), self.height())
         self._activeState = None
-        self._backgroundGrid = None
         self._textureShape = None
-        self._shapes = []
-        self._camera = None
         self._lineShader = None
-
+        self._shapes = []
         self._showTexture = config.displayTexture
         self._textureRepeat = config.textureRepeat
         self._showGrid = config.displayGrid
@@ -219,19 +220,11 @@ class UVViewerWidget(QtWidgets.QOpenGLWidget):
     # GL EVENTS
     def initializeGL(self):
         """Setup GL objects for the view ready for drawing."""
-        self._backgroundGrid = gl_shape.Grid()
-        self._camera = gl_camera.Camera2D(self.width(), self.height())
         self._lineShader = gl_shader.LineShader()
         self._textureShape = gl_shape.TextureShape(
             shader=gl_shader.TextureShader(),
             textureRepeat=self._textureRepeat,
         )
-        self._painter = QtGui.QPainter()
-
-        self._gridNumbersFont = QtGui.QFont()
-        self._gridNumbersFont.setPointSize(8)
-        self._uvInfoFont = QtGui.QFont()
-        self._uvInfoFont.setPointSize(12)
 
     def _cleanupGL(self):
         """Delete the various GL resources that have been created for the view."""
