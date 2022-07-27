@@ -64,12 +64,14 @@ class SessionManager:
             self.clear()
         return True
 
-    def addPrimPaths(self, primPaths, replace=False):
+    def addPrimPaths(self, primPaths, replace=False, refresh=True):
         """Add a list of prim paths.
 
         Args:
             primPaths (list[str]): List of prim paths to get from the active stage.
             replace (bool): If true, remove any of the current cached uc_usdextractor.
+            refresh (bool): If True and replace is True, will remove an existing extractor that matches
+                            a prim, and re-evaluate it. Set to False if no change has occurred since last adding it.
         Returns
             list[uc_usdextractor.PrimDataExtractor]:
                 List of any new uv extractors and list of any new texture uc_usdextractor.
@@ -79,20 +81,28 @@ class SessionManager:
             logger.error("No stage set to extract prims from.")
             return []
         prims = [stage.GetPrimAtPath(primPath) for primPath in primPaths]
-        return self.addPrims(prims, replace)
+        return self.addPrims(prims, replace, refresh)
 
-    def addPrims(self, prims, replace=False):
+    def addPrims(self, prims, replace=False, refresh=True):
         """Add a list of usd prims.
 
         Args:
             prims (Usd.Prim): List of prims to get from the stage.
             replace (bool): If true, remove any of the current cached uc_usdextractor.
+            refresh (bool): If True and replace is True, will remove an existing extractor that matches
+                            a prim, and re-evaluate it. Set to False if no change has occurred since last adding it.
         Returns
             list[uc_usdextractor.PrimDataExtractor]:
                 List of any new uv extractors and list of any new texture uc_usdextractor.
         """
         if replace:
-            self._extractors = []
+            extractors = []
+            if not refresh:
+                for extractor in self._extractors:
+                    for prim in prims:
+                        if prim == extractor.prim():
+                            extractors.append(extractor)
+            self._extractors = extractors
 
         newExtractors = []
         for prim in prims:
@@ -262,12 +272,12 @@ class SessionManager:
         return self._activeUVSetName
 
     def setActiveUVSetName(self, name):
-        """Set the uv name. The name must exist in the list of avaiable uv set names.
+        """Set the uv name. The name must exist in the list of available uv set names.
 
         Args:
             name (str): The name of the UV set to change the viewer to.
         Returns
-            bool: True if change occured, false otherwise.
+            bool: True if change occurred, false otherwise.
         """
         if name == self._activeUVSetName:
             logger.debug("UV name already set to %s.", name)
@@ -319,7 +329,7 @@ class SessionManager:
         Args:
             path (str): The texture path to add.
         Returns
-            bool: True if succesfully set, false otherwise.
+            bool: True if successfully set, false otherwise.
         """
         path = os.path.abspath(path)
         if path == self._activeTexturePath:

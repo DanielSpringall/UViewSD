@@ -242,7 +242,7 @@ class UViewSDMixin(QtCore.QObject):
         """
         Programatically set the uv set name to be used by the viewer. This will update the name in the UI,
         as well as refresh the shapes in the viewer to use the new uv set name.
-        The name must exist in the list of avaiable uv set names for a change to occur.
+        The name must exist in the list of available uv set names for a change to occur.
 
         Args:
             name (str): The name of the UV set to change the viewer to.
@@ -400,27 +400,31 @@ class UViewSDMixin(QtCore.QObject):
         if changed:
             self.refresh()
 
-    def addPrimPaths(self, primPaths, replace=False):
+    def addPrimPaths(self, primPaths, replace=False, refresh=True):
         """Add a given list of prim paths to the viewer.
 
         Args:
             primPaths (list[str]): List of prim paths to get from the stage and add to the view.
             replace (bool): If True, will clear the current uv's from the view before adding anything new.
+            refresh (bool): If True and replace is True, will force refresh the prims that already exist in
+                            the view. Otherwise assumes that no changes have occurred to them.
         """
-        extractors = self._sessionManager.addPrimPaths(primPaths, replace)
+        extractors = self._sessionManager.addPrimPaths(primPaths, replace, refresh)
         if extractors or replace:
             self._updateUvSetNameOptions()
             self._updateTextureOptions()
             self.updateUVs(extractors=extractors, replace=replace)
 
-    def addPrims(self, prims, replace=False):
+    def addPrims(self, prims, replace=False, refresh=True):
         """Add a list of usd prims to the viewer.
 
         Args:
             prims (Usd.Prim): List of prims to get from the stage and add to the view.
             replace (bool): If True, will clear the current uv's from the view before adding anything new.
+            refresh (bool): If True and replace is True, will force refresh the prims that already exist in
+                            the view. Otherwise assumes that no changes have occurred to them.
         """
-        extractors = self._sessionManager.addPrims(prims, replace)
+        extractors = self._sessionManager.addPrims(prims, replace, refresh)
         if extractors or replace:
             self._updateUvSetNameOptions()
             self._updateTextureOptions()
@@ -494,6 +498,13 @@ class UViewSDMixin(QtCore.QObject):
         """Clear the viewer of any uvs currently drawn on the screen."""
         self._sessionManager.clear()
         self._view.clear()
+
+    def focusOnBBox(self):
+        """
+        Focus the view on the bounds of all the UVs in the view. Or if no
+        UVs are currently graphed fit to the (0, 0) - (1, 1) graph co-ordinates.
+        """
+        self._view.focusOnBBox()
 
 
 class UViewSDWindow(QtWidgets.QMainWindow, UViewSDMixin):
